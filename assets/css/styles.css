@@ -7288,6 +7288,12 @@
       cursor: default !important;
     }
 
+    /* Keep the custom cursor active across the recommendation timeline area. */
+    .timeline-viz-section,
+    .timeline-art {
+      cursor: none !important;
+    }
+
     @media (max-width: 768px),
     (hover: none) and (pointer: coarse) {
       .interaction-desktop {
