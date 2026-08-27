@@ -124,6 +124,7 @@ let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeMountToken = 0;
 let youtubePlaybackMonitor = null;
+let youtubePlaybackWorker = null;
 let autoNextTransitionLock = false;
 let youtubeAutoQueue = [];
 
@@ -1817,17 +1818,44 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
           } catch { }
 
           clearInterval(youtubePlaybackMonitor);
-          youtubePlaybackMonitor = setInterval(() => {
-            if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+          youtubePlaybackWorker?.terminate?.();
 
-            try {
-              const state = youtubePlayer.getPlayerState?.();
-              if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
-                syncYouTubeQueueSong(youtubePlayer);
-                playNextSong();
-              }
-            } catch { }
-          }, 1000);
+          // Use a worker clock so background tabs are less affected by normal
+          // window timer throttling. The worker only signals a check; the
+          // YouTube API call still runs on the main thread.
+          try {
+            youtubePlaybackWorker = new Worker(
+              URL.createObjectURL(
+                new Blob([
+                  `setInterval(() => postMessage("tick"), 1000);`
+                ], { type: "application/javascript" })
+              )
+            );
+
+            youtubePlaybackWorker.onmessage = () => {
+              if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+
+              try {
+                const state = youtubePlayer.getPlayerState?.();
+                if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
+                  syncYouTubeQueueSong(youtubePlayer);
+                  playNextSong();
+                }
+              } catch { }
+            };
+          } catch {
+            youtubePlaybackMonitor = setInterval(() => {
+              if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+
+              try {
+                const state = youtubePlayer.getPlayerState?.();
+                if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
+                  syncYouTubeQueueSong(youtubePlayer);
+                  playNextSong();
+                }
+              } catch { }
+            }, 1000);
+          }
         },
 
         onStateChange: event => {
