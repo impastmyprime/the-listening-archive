@@ -1749,6 +1749,39 @@ function playNextSong() {
         ? "spotify"
         : null;
 
+  if (preferredSource === "youtube") {
+    const nextVideoId = getYouTubeVideoId(nextSong.youtubeUrl);
+
+    // Keep the existing YouTube player session during auto-next.
+    // Recreating the iframe can trigger background autoplay restrictions.
+    if (
+      youtubePlayer &&
+      nextVideoId &&
+      typeof youtubePlayer.loadVideoById === "function"
+    ) {
+      currentSongId = nextSong.id;
+      currentSource = "youtube";
+      setScriptAwareText(playerTitle, nextSong.title);
+      setScriptAwareText(playerArtist, nextSong.artist);
+      renderSourceTabs(nextSong, "youtube");
+      playerStatus.textContent = "NOW PLAYING · YOUTUBE";
+      void markSongRead(nextSong);
+      syncPlayButtons();
+      syncStatsPlayingState();
+
+      try {
+        youtubePlayer.loadVideoById(nextVideoId);
+      } catch {
+        playSong(nextSong, preferredSource);
+      } finally {
+        setTimeout(() => {
+          autoNextTransitionLock = false;
+        }, 500);
+      }
+      return;
+    }
+  }
+
   if (preferredSource) {
     playSong(nextSong, preferredSource).finally?.(() => {
       autoNextTransitionLock = false;
