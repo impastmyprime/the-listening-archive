@@ -123,6 +123,8 @@ let autoNextEnabled = localStorage.getItem(AUTO_NEXT_STORAGE) === "true";
 let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeMountToken = 0;
+let youtubePlaybackMonitor = null;
+let autoNextTransitionLock = false;
 let youtubeAutoQueue = [];
 
 const songList = document.querySelector("#songList");
@@ -1729,7 +1731,8 @@ function syncYouTubeQueueSong(player = youtubePlayer) {
 }
 
 function playNextSong() {
-  if (!autoNextEnabled || !currentSongId) return;
+  if (autoNextTransitionLock || !autoNextEnabled || !currentSongId) return;
+  autoNextTransitionLock = true;
 
   const nextSong = nextPlayableSong(currentSongId);
 
@@ -1746,7 +1749,11 @@ function playNextSong() {
         : null;
 
   if (preferredSource) {
-    playSong(nextSong, preferredSource);
+    playSong(nextSong, preferredSource).finally?.(() => {
+      autoNextTransitionLock = false;
+    });
+  } else {
+    autoNextTransitionLock = false;
   }
 }
 
@@ -1808,6 +1815,19 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
             event.target.setVolume?.(100);
             event.target.playVideo();
           } catch { }
+
+          clearInterval(youtubePlaybackMonitor);
+          youtubePlaybackMonitor = setInterval(() => {
+            if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+
+            try {
+              const state = youtubePlayer.getPlayerState?.();
+              if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
+                syncYouTubeQueueSong(youtubePlayer);
+                playNextSong();
+              }
+            } catch { }
+          }, 1000);
         },
 
         onStateChange: event => {
