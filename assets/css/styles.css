@@ -7290,7 +7290,9 @@
 
     /* Keep the custom cursor active across the recommendation timeline area. */
     .timeline-viz-section,
-    .timeline-art {
+    .timeline-art,
+    .timeline-viz-section *,
+    .timeline-art * {
       cursor: none !important;
     }
 
