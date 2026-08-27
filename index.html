@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <meta content="#5f7cff" name="theme-color" />
+  <meta content="strict-origin-when-cross-origin" name="referrer" />
+  <title>The Listening Archive</title>
+  <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg?v=90" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png?v=90" />
+  <link rel="icon" type="image/png" sizes="48x48" href="assets/images/favicon-48.png?v=90" />
+  <link rel="shortcut icon" href="assets/images/favicon.ico?v=90" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/images/apple-touch-icon.png?v=90" />
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=120" />
+</head>
+
+<body class="access-checking">
+  <div class="custom-cursor" id="customCursor" data-state="default" aria-hidden="true">
+    <div class="custom-cursor-layer custom-cursor-default">
+      <img class="custom-cursor-cat" src="assets/cursors/cat.svg?v=97" alt="" draggable="false" />
+      <img class="custom-cursor-arrow" src="assets/cursors/arrow.svg?v=97" alt="" draggable="false" />
+    </div>
+    <div class="custom-cursor-layer custom-cursor-hover">
+      <img class="custom-cursor-cat" src="assets/cursors/cat.svg?v=97" alt="" draggable="false" />
+      <img class="custom-cursor-hand" src="assets/cursors/hover.svg?v=97" alt="" draggable="false" />
+    </div>
+    <div class="custom-cursor-layer custom-cursor-click">
+      <img class="custom-cursor-cat" src="assets/cursors/cat.svg?v=97" alt="" draggable="false" />
+      <img class="custom-cursor-hand" src="assets/cursors/click.svg?v=97" alt="" draggable="false" />
+    </div>
+  </div>
+  <section class="access-gate" id="accessGate" aria-labelledby="accessGateTitle">
+    <div class="access-gate-inner">
+      <div class="access-hero">
+        <div class="access-title-form-row">
+          <h2 class="access-title" id="accessGateTitle">
+            <span class="access-title-the">THE</span>
+            <span class="access-title-listening">LISTENING</span>
+            <span class="access-title-archive">ARCHIVE</span>
+          </h2>
+
+          <form class="access-form" id="accessForm">
+            <label class="sr-only" for="accessCode">ACCESS CODE</label>
+
+            <div class="access-input-row">
+              <div class="access-code-wrap">
+                <input id="accessCode" name="accessCode" type="password" autocomplete="off" spellcheck="false"
+                  placeholder="Enter your access code here" required />
+                <button type="button" class="access-code-toggle" id="accessCodeToggle" aria-label="Show access code"
+                  aria-pressed="false">
+                  <svg class="access-eye access-eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                    <circle cx="12" cy="12" r="2.75"></circle>
+                  </svg>
+                  <svg class="access-eye access-eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 3l18 18"></path>
+                    <path d="M9.9 5.3A10.8 10.8 0 0 1 12 5c6 0 9.5 7 9.5 7a16.6 16.6 0 0 1-3.2 4.1"></path>
+                    <path d="M6.1 6.1C3.8 8 2.5 12 2.5 12S6 19 12 19a10 10 0 0 0 4-.8"></path>
+                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+                  </svg>
+                </button>
+              </div>
+              <button type="submit" id="accessSubmit">ENTER →</button>
+            </div>
+
+            <p class="access-status" id="accessStatus" aria-live="polite">
+              CONNECTING TO ARCHIVE…
+            </p>
+          </form>
+        </div>
+
+        <span class="access-index">01 / 02</span>
+
+        <p class="access-description">
+          A place for songs<br>
+          passed back and forth
+        </p>
+      </div>
+
+      <div class="access-art" aria-hidden="true">
+        <img src="assets/images/access-halftone.png" alt="">
+      </div>
+    </div>
+  </section>
+  <div class="app-shell" id="appShell" aria-hidden="true">
+    <div aria-hidden="true" class="page-noise"></div>
+    <header class="site-header">
+      <div class="title-wrap">
+        <h1 class="inside-archive-title">
+          <span class="inside-title-the">THE</span>
+          <span class="inside-title-listening">LISTENING</span>
+          <span class="inside-title-archive">ARCHIVE</span>
+        </h1>
+        <p class="intro">A tiny archive of songs passed back and forth. Add one when somebody says “you need to hear
+          this.”</p>
+      </div>
+      <div class="header-side">
+        <div class="header-meta">
+          <div><span class="meta-label">ARCHIVE</span><span id="songCount">000 SONGS</span></div>
+          <div><span class="meta-label">LISTENERS</span><span><span data-owner-name></span> &amp; <span
+                data-friend-name></span></span></div>
+        </div>
+
+        <section class="pixel-board-panel" aria-labelledby="pixelBoardTitle">
+          <div class="pixel-board-head">
+            <div>
+              <span class="meta-label" id="pixelBoardTitle">LIVE PIXEL BOARD</span>
+              <span class="pixel-board-status" id="pixelBoardStatus">WAITING…</span>
+            </div>
+          </div>
+
+          <div class="pixel-tools" aria-label="Pixel board tools">
+            <div class="pixel-tool-group pixel-tool-modes" role="group" aria-label="Drawing tool">
+              <button class="pixel-tool-button" id="pixelBrushTool" type="button" aria-pressed="false"
+                disabled>
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M10.6 2.1 13.9 5.4 7.1 12.2 3.8 8.9 10.6 2.1Z" fill="none" stroke="currentColor"
+                    stroke-width="1.25" />
+                  <path d="M3.7 9.2C2.1 10 2.1 11.4 2 13.9c2.5-.1 3.9-.1 4.7-1.7" fill="none" stroke="currentColor"
+                    stroke-width="1.25" />
+                </svg>
+                <span>BRUSH</span>
+              </button>
+
+              <button class="pixel-tool-button" id="pixelFillTool" type="button" aria-pressed="false" disabled>
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M5.2 2.7 11.7 9.2 7.2 13.7 1.9 8.4 8.4 1.9" fill="none" stroke="currentColor"
+                    stroke-width="1.25" stroke-linejoin="miter" />
+                  <path d="M10.8 12.2c.7-1.2 1.4-2 2-2.7.6.8 1.3 1.6 1.3 2.7 0 .9-.7 1.6-1.6 1.6s-1.7-.7-1.7-1.6Z"
+                    fill="none" stroke="currentColor" stroke-width="1.15" />
+                </svg>
+                <span>FILL</span>
+              </button>
+
+              <button class="pixel-tool-button" id="pixelEraserTool" type="button" aria-pressed="false" disabled>
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="m5.1 11.9-2.7-2.7 5.7-5.7 4.2 4.2-4.2 4.2H5.1Z" fill="none" stroke="currentColor"
+                    stroke-width="1.25" />
+                  <path d="M7.9 11.9h5.7" fill="none" stroke="currentColor" stroke-width="1.25" />
+                </svg>
+                <span>ERASER</span>
+              </button>
+            </div>
+
+            <div class="pixel-tool-group pixel-color-group" aria-label="Brush color">
+              <span class="pixel-tool-label">COLOR</span>
+
+              <div class="pixel-swatches" id="pixelSwatches">
+                <button class="pixel-swatch is-active" type="button" data-color="#E7FE00" aria-label="Acid lime"
+                  aria-pressed="true" style="--swatch:#E7FE00"></button>
+                <button class="pixel-swatch" type="button" data-color="#5F7CFF" aria-label="Blue" aria-pressed="false"
+                  style="--swatch:#5F7CFF"></button>
+                <button class="pixel-swatch" type="button" data-color="#111111" aria-label="Black" aria-pressed="false"
+                  style="--swatch:#111111"></button>
+                <button class="pixel-swatch" type="button" data-color="#FF5BB8" aria-label="Pink" aria-pressed="false"
+                  style="--swatch:#FF5BB8"></button>
+                <button class="pixel-swatch" type="button" data-color="#55F3FF" aria-label="Cyan" aria-pressed="false"
+                  style="--swatch:#55F3FF"></button>
+                <button class="pixel-swatch" type="button" data-color="#FF8A3D" aria-label="Orange" aria-pressed="false"
+                  style="--swatch:#FF8A3D"></button>
+              </div>
+
+              <label class="pixel-custom-color" aria-label="Custom color">
+                <span>+</span>
+                <input id="pixelCustomColor" type="color" value="#E7FE00" disabled>
+              </label>
+            </div>
+
+            <button class="pixel-clear-all" id="pixelBoardClear" type="button" disabled>
+              CLEAR ALL
+            </button>
+          </div>
+
+          <div class="pixel-board-stage" id="pixelBoardStage">
+            <canvas id="pixelBoard" class="pixel-board" width="320" height="160"
+              aria-label="Shared realtime 40 by 20 pixel drawing board"></canvas>
+          </div>
+
+          <div class="pixel-board-foot">
+            <span id="pixelToolHint">BRUSH · DRAG TO DRAW</span>
+            <span>LIVE BETWEEN BOTH DEVICES</span>
+          </div>
+        </section>
+      </div>
+    </header>
+    <main>
+      <section aria-label="Archive controls" class="toolbar">
+        <div aria-label="View" class="view-switch">
+          <button class="view-button active" data-view="archive">ARCHIVE</button>
+          <button class="view-button" data-view="stats">STATS</button>
+        </div>
+        <div class="archive-tools" id="archiveTools">
+          <div class="filter-group" id="filters">
+            <button class="filter active" data-filter="all">ALL</button>
+            <button class="filter" data-filter="me">FROM <span data-owner-name></span></button>
+            <button class="filter" data-filter="friend">FROM <span data-friend-name></span></button>
+          </div>
+          <label class="search-wrap"><span class="sr-only">Search songs</span><input autocomplete="off" id="searchInput"
+              placeholder="SEARCH TITLE / ARTIST / NOTE" type="search" /></label>
+          <button class="text-button random-button" id="randomSong" type="button">
+            <svg class="random-icon random-icon-play" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+              <path d="M3 2.25L9.25 6 3 9.75Z" fill="currentColor" />
+            </svg>
+            <span>RANDOM</span>
+            <svg class="random-icon random-icon-arrow" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+              <path d="M3 9L9 3M5.25 3H9V6.75" fill="none" stroke="currentColor" stroke-width="1.35"
+                stroke-linecap="square" stroke-linejoin="miter" />
+            </svg>
+          </button>
+        </div>
+        <div aria-label="Quick actions" class="nav-actions">
+          <button aria-pressed="false" class="nav-action" id="autoNextToggle" type="button">AUTO NEXT OFF</button>
+          <button class="nav-action nav-add-song" id="addSongNav" type="button">+ ADD SONG</button>
+        </div>
+      </section>
+      <section class="archive" id="archiveView">
+        <div class="table-head"><span>NO.</span><span>SONG</span><span>ARTIST</span><span>FROM</span><span>DATE</span>
+        </div>
+        <div aria-live="polite" class="song-list" id="songList"></div>
+        <div class="empty-state" hidden="" id="emptyState">NOTHING HERE. EXTREMELY SUSPICIOUS.</div>
+      </section>
+      <section class="stats-view" hidden="" id="statsView">
+        <header class="stats-hero">
+          <div class="stats-eyebrow">THE EXTREMELY UNNECESSARY DATA DEPARTMENT</div>
+          <h2 id="statsHeadline">WE HAVE DATA NOW. BAD NEWS.</h2>
+          <div class="stats-summary-line">
+            <span id="statsTotal">000 SONGS</span>
+            <span id="statsRange">SINCE —</span>
+          </div>
+        </header>
+        <section aria-label="Archive statistics" class="stats-cards">
+          <article class="stat-card stat-card-balance">
+            <span class="stat-label">WHO WON'T STOP SENDING SONGS</span>
+            <div class="balance-numbers">
+              <div><strong id="statsMeCount">0</strong><span data-owner-name></span></div>
+              <div><strong id="statsYouCount">0</strong><span data-friend-name></span></div>
+            </div>
+            <div aria-hidden="true" class="balance-track" id="balanceTrack"></div>
+            <p class="stat-copy" id="statsBalanceCopy"></p>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">ON REPEAT</span>
+            <strong class="stat-big" id="statsTopArtist">—</strong>
+            <p class="stat-copy" id="statsTopArtistCopy"></p>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">LONGEST SILENCE</span>
+            <strong class="stat-big" id="statsLongestGap">—</strong>
+            <p class="stat-copy">Apparently nobody had anything worth sending.</p>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">LONGEST MONOLOGUE</span>
+            <strong class="stat-big" id="statsLongestStreak">—</strong>
+            <p class="stat-copy" id="statsStreakCopy"></p>
+          </article>
+        </section>
+        <section class="viz-section timeline-viz-section">
+          <div class="viz-heading">
+            <div>
+              <span class="stat-label">RECOMMENDATION TIMELINE</span>
+              <h3>WHEN THE SONGS STARTED FLYING</h3>
+            </div>
+            <div class="viz-side">
+              <div class="timeline-legend"><span class="legend-me"></span><span class="legend-you"></span></div><span class="interaction-hint"><span class="interaction-desktop">HOVER TO INSPECT</span><span class="interaction-mobile">SWIPE TIMELINE · TAP A SONG</span></span>
+            </div>
+          </div>
+          <div aria-label="Song recommendation timeline" class="timeline-art" id="timelineArt"></div>
+          <div class="timeline-dates"><span id="timelineStart">—</span><span id="timelineEnd">—</span></div>
+        </section>
+        <section class="viz-section monthly-viz-section">
+          <div class="viz-heading">
+            <div>
+              <span class="stat-label">MONTHLY ACTIVITY</span>
+              <h3>HOW BAD DID IT GET?</h3>
+            </div>
+            <p class="viz-note" id="monthlyLegendNote"><span class="interaction-desktop">HOVER TO INSPECT</span><span class="interaction-mobile">TAP TO INSPECT</span></p>
+          </div>
+          <div aria-label="Monthly recommendation activity" class="monthly-art" id="monthlyArt"></div>
+        </section>
+        <section class="viz-section artist-section">
+          <div class="viz-heading">
+            <div>
+              <span class="stat-label">RECURRING ARTISTS</span>
+              <h3>THEY KEEP COMING BACK</h3>
+            </div>
+            <p class="viz-note"><span class="interaction-desktop">HOVER TO COMPARE</span><span class="interaction-mobile">TAP TO COMPARE</span></p>
+          </div>
+          <div class="artist-ranking" id="artistRanking"></div>
+        </section>
+        <section class="viz-section">
+          <div class="viz-heading">
+            <div>
+              <span class="stat-label">OTHER QUESTIONABLE FINDINGS</span>
+              <h3>THINGS THE ARCHIVE KNOWS ABOUT YOU</h3>
+            </div>
+          </div>
+          <div class="weird-facts" id="weirdFacts"></div>
+        </section>
+        <div class="stats-tooltip" hidden="" id="statsTooltip"></div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <button class="giant-add" id="addSongBottom">+ ADD ANOTHER SONG</button>
+      <div class="footer-row">
+        <span id="footerArchiveSummary">BUILT FOR TWO PEOPLE WITH TOO MANY SONGS.</span>
+        <button class="text-button" id="backToTop" type="button">BACK TO TOP ↑</button>
+      </div>
+    </footer>
+    <aside aria-label="Music player" class="player-bar" hidden="" id="playerBar">
+      <div class="player-copy">
+        <span class="player-kicker">NOW PLAYING</span>
+        <strong id="playerTitle">—</strong>
+        <span id="playerArtist">—</span>
+        <span class="player-status" id="playerStatus">READY</span>
+        <div aria-label="Playback source" class="source-tabs" id="sourceTabs"></div>
+      </div>
+      <div class="media-embed" id="mediaEmbed"></div>
+      <button aria-label="Close player" class="player-close" id="closePlayer" type="button">×</button>
+    </aside>
+    <dialog class="song-dialog" id="songDialog">
+      <form id="songForm" method="dialog">
+        <div class="dialog-top">
+          <h2>ADD A SONG</h2><button aria-label="Close" class="close-button" id="closeDialog" type="button">×</button>
+        </div>
+        <div class="form-grid">
+          <label><span>SONG TITLE *</span><input name="title" placeholder="e.g. Sugar for the Pill"
+              required="" /></label>
+          <label><span>ARTIST *</span><input name="artist" placeholder="e.g. Slowdive" required="" /></label>
+          <label>
+            <span>YOUTUBE LINK</span>
+            <input name="youtubeUrl" placeholder="Link will be found automatically" type="url" />
+            <small class="field-help" id="youtubeAutoStatus">OPTIONAL</small>
+          </label>
+          <label>
+            <span>SPOTIFY LINK</span>
+            <input name="spotifyUrl" placeholder="https://open.spotify.com/track/…" type="url" />
+            <small class="field-help">OPTIONAL</small>
+          </label>
+          <div class="identity-field"><span>RECOMMENDED BY</span><strong id="currentSenderIdentity"></strong></div>
+          <label class="full"><span>NOTE</span><textarea name="note" placeholder="the bridge at 2:41 got me"
+              rows="4"></textarea></label>
+        </div>
+        <div class="dialog-actions">
+
+          <button class="submit-button" type="submit">ADD TO ARCHIVE →</button>
+        </div>
+      </form>
+    </dialog>
+    <template id="songRowTemplate">
+      <article class="song-row">
+        <div class="row-main">
+          <span class="song-number"></span><button class="song-title" type="button"><span
+              class="song-title-text"></span><span aria-hidden="true" class="archive-playing-indicator"><span
+                class="archive-eq-bars"><i></i><i></i><i></i></span><span
+                class="archive-playing-label">PLAYING</span></span></button><span class="song-artist"></span><span
+            class="song-from"></span><span class="song-date"></span><button aria-expanded="false"
+            class="mobile-details-toggle" type="button">NOTE +</button>
+        </div>
+        <div class="row-expanded">
+          <span class="expanded-number"></span>
+          <div class="expanded-copy">
+            <p class="expanded-note"></p>
+          </div>
+          <div class="expanded-actions"><button class="play-song" type="button"><svg class="play-action-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 2.25L9.25 6 3 9.75Z" fill="currentColor" /></svg><span>PLAY HERE</span></button><button
+              class="delete-song" type="button">DELETE</button></div>
+        </div>
+      </article>
+    </template>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/app.js?v=121"></script>
+  <script src="assets/js/mobile-title-gap.js?v=109"></script>
+
+</body>
+
+</html>

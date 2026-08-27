@@ -1,0 +1,18 @@
+# Local secrets / environment files
+.env
+.env.*
+!.env.example
+
+# Supabase local/dev state (do not commit generated local state)
+supabase/.temp/
+.supabase/
+
+# Dependencies / logs
+node_modules/
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
