@@ -1787,10 +1787,6 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
       start: Math.max(0, Math.floor(startSeconds))
     };
 
-    if (queuedVideoIds.length) {
-      playerVars.playlist = queuedVideoIds.join(",");
-    }
-
     youtubePlayer = new YT.Player(mount, {
       width: "100%",
       height: "152",
@@ -1824,22 +1820,15 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
 
           if (event.data !== window.YT.PlayerState.ENDED) return;
 
+          // Always handle next track ourselves instead of relying on
+          // YouTube playlist state. This keeps newly added songs available
+          // and prevents failures when the browser tab is backgrounded.
           const activeItem = syncYouTubeQueueSong(event.target);
-          const activeVideoId = String(event.target.getVideoData?.()?.video_id || "");
-          const queueIndex = youtubeAutoQueue.findIndex(
-            item => item.videoId === activeVideoId
-          );
-
-          if (
-            autoNextEnabled &&
-            queueIndex >= 0 &&
-            queueIndex < youtubeAutoQueue.length - 1
-          ) {
-            return;
-          }
 
           if (activeItem || currentSongId === song.id) {
-            playNextSong();
+            setTimeout(() => {
+              playNextSong();
+            }, 250);
           }
         },
 
