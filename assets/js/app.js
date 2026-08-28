@@ -119,7 +119,12 @@ let currentSource = null;
 
 const AUTO_NEXT_STORAGE = "songs-we-sent-auto-next-v1";
 
-let autoNextEnabled = localStorage.getItem(AUTO_NEXT_STORAGE) === "true";
+// Auto Next always starts enabled on every fresh page load.
+// The control can still be toggled OFF for the current page session.
+let autoNextEnabled = true;
+try {
+  localStorage.setItem(AUTO_NEXT_STORAGE, "true");
+} catch { }
 let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeMountToken = 0;
@@ -1587,7 +1592,9 @@ function syncPlaybackPreferenceUi() {
 
 autoNextToggle.addEventListener("click", () => {
   autoNextEnabled = !autoNextEnabled;
-  localStorage.setItem(AUTO_NEXT_STORAGE, String(autoNextEnabled));
+  try {
+    localStorage.setItem(AUTO_NEXT_STORAGE, String(autoNextEnabled));
+  } catch { }
   syncPlaybackPreferenceUi();
 
   if (currentSource === "youtube" && currentSongId && youtubePlayer) {
@@ -1739,6 +1746,7 @@ function playNextSong() {
 
   if (!nextSong) {
     playerStatus.textContent = "AUTO NEXT · END OF ARCHIVE";
+    autoNextTransitionLock = false;
     return;
   }
 
@@ -1783,9 +1791,12 @@ function playNextSong() {
   }
 
   if (preferredSource) {
-    playSong(nextSong, preferredSource).finally?.(() => {
+    // playSong() is synchronous; release the guard shortly after switching
+    // tracks so duplicate ENDED events cannot immediately skip another song.
+    playSong(nextSong, preferredSource);
+    setTimeout(() => {
       autoNextTransitionLock = false;
-    });
+    }, 500);
   } else {
     autoNextTransitionLock = false;
   }
@@ -3129,6 +3140,10 @@ function bindTimelineClusterPreview(element, cluster) {
   });
 
   element.addEventListener("click", event => {
+    // Desktop timeline inspection is hover-only. Keep tap behavior available
+    // for coarse/touch pointers if clusters are ever reintroduced there.
+    if (!statsUseTapInteraction()) return;
+
     event.preventDefault();
     event.stopPropagation();
     hideStatsTooltip();
@@ -3262,15 +3277,9 @@ function buildMobileSequenceTimeline(ordered, viewportWidth) {
 }
 
 function buildTimelineClusters(ordered, start, span, trackWidth) {
-  if (statsUseTapInteraction()) {
-    return buildMobileSequenceTimeline(ordered, trackWidth);
-  }
-
-  return {
-    ...buildDesktopTimelineClusters(ordered, start, span, trackWidth),
-    monthMarkers: [],
-    trackMinWidth: 0
-  };
+  // Use the same one-song-per-point chronological layout on every viewport.
+  // This keeps desktop recommendations from collapsing into stacked clusters.
+  return buildMobileSequenceTimeline(ordered, trackWidth);
 }
 
 function renderMobileTimelineSequenceAxis(track, monthMarkers) {
@@ -3301,11 +3310,57 @@ function renderMobileTimelineSequenceAxis(track, monthMarkers) {
   track.appendChild(axis);
 }
 
+function bindTimelineTapEffect(dot) {
+  if (!dot) return;
+
+  let startX = 0;
+  let startY = 0;
+  let moved = false;
+  const cancelDistance = 10;
+
+  dot.addEventListener("pointerdown", event => {
+    if (!statsUseTapInteraction()) return;
+    if (event.pointerType === "mouse") return;
+
+    // Only track the gesture here. Holding a circle must have no scale effect.
+    startX = event.clientX;
+    startY = event.clientY;
+    moved = false;
+  });
+
+  dot.addEventListener("pointermove", event => {
+    if (!statsUseTapInteraction()) return;
+    if (event.pointerType === "mouse") return;
+
+    const distance = Math.hypot(
+      event.clientX - startX,
+      event.clientY - startY
+    );
+
+    if (distance > cancelDistance) moved = true;
+  });
+
+  dot.addEventListener("pointerup", event => {
+    if (!statsUseTapInteraction()) return;
+    if (event.pointerType === "mouse" || moved) return;
+
+    // A completed tap becomes a persistent mobile hover/selection state.
+    document.querySelectorAll(".timeline-dot.is-selected").forEach(otherDot => {
+      if (otherDot !== dot) otherDot.classList.remove("is-selected");
+    });
+    dot.classList.add("is-selected");
+  });
+
+  dot.addEventListener("pointercancel", () => {
+    moved = true;
+  });
+}
+
 function renderTimeline(stats) {
   hideTimelineClusterPopover();
   timelineArt.innerHTML = "";
-  const mobileSequence = statsUseTapInteraction();
-  timelineArt.classList.toggle("timeline-art-mobile-sequence", mobileSequence);
+  const sequenceTimeline = true;
+  timelineArt.classList.toggle("timeline-art-mobile-sequence", sequenceTimeline);
 
   if (!stats.ordered.length) return;
 
@@ -3331,7 +3386,7 @@ function renderTimeline(stats) {
   timelineArt.appendChild(lanes);
 
   let trackViewport = null;
-  if (mobileSequence) {
+  if (sequenceTimeline) {
     trackViewport = document.createElement("div");
     trackViewport.className = "timeline-track-viewport";
     trackViewport.appendChild(track);
@@ -3364,7 +3419,7 @@ function renderTimeline(stats) {
   );
   const clusters = timelineLayout.clusters;
 
-  if (mobileSequence) {
+  if (sequenceTimeline) {
     track.style.minWidth = `${timelineLayout.trackMinWidth}px`;
     renderMobileTimelineSequenceAxis(track, timelineLayout.monthMarkers);
   }
@@ -3382,7 +3437,7 @@ function renderTimeline(stats) {
       `timeline-dot ${cluster.lane === "me" ? "timeline-dot-me" : "timeline-dot-you"}` +
       clusterSizeClass;
 
-    dot.style.left = mobileSequence
+    dot.style.left = sequenceTimeline
       ? `${cluster.x}px`
       : `${cluster.ratio * 100}%`;
     dot.style.setProperty("--dot-index", cluster.firstIndex);
@@ -3415,6 +3470,7 @@ function renderTimeline(stats) {
     nowPlaying.setAttribute("aria-hidden", "true");
     nowPlaying.innerHTML = `<span></span><span></span><span></span>`;
     dot.appendChild(nowPlaying);
+    bindTimelineTapEffect(dot);
 
     track.appendChild(dot);
   });
@@ -3635,6 +3691,14 @@ function bindTooltip(element, allowHtml = false) {
       statsTooltip.dataset.triggerId === triggerId;
 
     if (sameTrigger) {
+      // Timeline dots behave like a persistent hover state on touch: tapping
+      // the selected circle again keeps both the circle and popup open.
+      if (element.classList.contains("timeline-dot") && element.classList.contains("is-selected")) {
+        showStatsTooltip(event, content);
+        statsTooltip.dataset.triggerId = triggerId;
+        return;
+      }
+
       hideStatsTooltip();
       return;
     }
@@ -3648,10 +3712,17 @@ function bindTooltip(element, allowHtml = false) {
   });
 }
 
-document.addEventListener("pointerdown", event => {
-  if (!statsUseTapInteraction() || !statsTooltip || statsTooltip.hidden) return;
+document.addEventListener("click", event => {
+  if (!statsUseTapInteraction()) return;
   if (event.target.closest('[data-stats-tooltip-trigger="true"]')) return;
-  hideStatsTooltip();
+
+  // Only a completed tap/click on empty space clears the persistent timeline
+  // selection. Touch-hold and swipe gestures do not dismiss it.
+  document.querySelectorAll(".timeline-dot.is-selected").forEach(dot => {
+    dot.classList.remove("is-selected");
+  });
+
+  if (statsTooltip && !statsTooltip.hidden) hideStatsTooltip();
 });
 
 function syncStatsPlayingState() {

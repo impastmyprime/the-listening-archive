@@ -8513,3 +8513,372 @@
     padding-right: 45px !important;
   }
 }
+
+/* Desktop recommendation timeline: match the mobile one-song-per-point sequence.
+   Desktop remains hover-only; the sequence can be horizontally inspected when needed. */
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .timeline-art.timeline-art-mobile-sequence {
+    grid-template-columns: var(--timeline-lane-width, 54px) minmax(0, 1fr) !important;
+    column-gap: 10px !important;
+    height: 160px !important;
+    overflow: visible !important;
+  }
+
+  .timeline-art-mobile-sequence .timeline-track-viewport {
+    min-width: 0;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .timeline-art-mobile-sequence .timeline-track-viewport::-webkit-scrollbar {
+    display: none;
+  }
+
+  .timeline-art-mobile-sequence .timeline-track {
+    position: relative;
+    height: 100%;
+    overflow: visible !important;
+    padding-bottom: 24px;
+  }
+
+  .timeline-art-mobile-sequence .timeline-dot:first-of-type,
+  .timeline-art-mobile-sequence .timeline-dot:last-of-type {
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .timeline-art-mobile-sequence + .timeline-dates {
+    display: none !important;
+  }
+
+  .timeline-art-mobile-sequence .timeline-mobile-sequence-axis {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .timeline-art-mobile-sequence .timeline-mobile-sequence-tick {
+    position: absolute;
+    inset-block: 0;
+    width: 0;
+  }
+
+  .timeline-art-mobile-sequence .timeline-mobile-sequence-tick::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 1px;
+    height: 7px;
+    background: currentColor;
+    transform: translateY(-50%);
+    opacity: .34;
+  }
+
+  .timeline-art-mobile-sequence .timeline-mobile-sequence-label {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    font-family: Inter, Arial, sans-serif;
+    font-size: 7px;
+    line-height: 1;
+    font-weight: 650;
+    letter-spacing: .015em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    opacity: .72;
+  }
+
+  .timeline-art-mobile-sequence .timeline-dot {
+    z-index: 2;
+  }
+}
+
+/* Timeline popup/title consistency + clearer month labels.
+   Song titles inside timeline tooltips use a script-aware nested span; inherit
+   the strong title typography so they match recurring-artist popup titles. */
+.stats-tooltip strong > span {
+  font-family: inherit !important;
+  font-style: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+}
+
+.timeline-mobile-sequence-label,
+.timeline-art-mobile-sequence .timeline-mobile-sequence-label {
+  font-size: 9px !important;
+}
+
+@media (max-width: 380px) {
+  .timeline-mobile-sequence-label,
+  .timeline-art-mobile-sequence .timeline-mobile-sequence-label {
+    font-size: 8px !important;
+  }
+}
+
+/* Smooth centered hover for recommendation timeline dots.
+   Keep every point anchored to its visual center and animate only transform,
+   so the circle grows without width/height reflow or edge-origin jumps. */
+@media (hover: hover) and (pointer: fine) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:last-of-type {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    transform: translate(-50%, -50%) scale(1) !important;
+    transform-origin: 50% 50% !important;
+    scale: none !important;
+    will-change: transform, opacity;
+    transition:
+      width 280ms cubic-bezier(.22, 1, .36, 1),
+      height 280ms cubic-bezier(.22, 1, .36, 1),
+      transform 320ms cubic-bezier(.22, 1, .36, 1),
+      opacity 220ms ease,
+      background-color 220ms ease,
+      border-color 220ms ease !important;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence:hover .timeline-dot {
+    opacity: .48;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:focus-visible,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type:focus-visible,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:last-of-type:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:last-of-type:focus-visible {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    transform: translate(-50%, -50%) scale(1.65) !important;
+    transform-origin: 50% 50% !important;
+    scale: none !important;
+    opacity: 1 !important;
+    z-index: 8 !important;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:focus-visible {
+    transform: translate(-50%, -50%) scale(1.08) !important;
+    transform-origin: 50% 50% !important;
+    scale: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Playing recommendation point: keep the waveform legible.
+   This override intentionally comes after the hover-normalization rules,
+   which otherwise reduce the active dot back to the normal 8px size. */
+.timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing,
+.timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type,
+.timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+  transform-origin: 50% 50% !important;
+  scale: none !important;
+  opacity: 1 !important;
+  z-index: 12 !important;
+}
+
+.timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing .timeline-now-playing {
+  gap: 2.5px;
+}
+
+.timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing .timeline-now-playing span {
+  width: 2.5px;
+  height: 10px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:focus-visible,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type:focus-visible,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type:hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type:focus-visible {
+    width: 36px !important;
+    height: 36px !important;
+    transform: translate(-50%, -50%) scale(1.08) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing .timeline-now-playing span {
+    height: 9px;
+  }
+}
+
+
+
+/* Mobile recommendation timeline selection.
+   A touch press itself has no visual effect. A completed tap selects one dot,
+   keeping the same centered scale as desktop hover until another dot or empty
+   space is tapped. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:last-of-type {
+    transform: translate(-50%, -50%) scale(1) !important;
+    transform-origin: 50% 50% !important;
+    scale: none !important;
+    will-change: transform, opacity;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 320ms cubic-bezier(.22, 1, .36, 1),
+      opacity 220ms ease,
+      background-color 220ms ease,
+      border-color 220ms ease !important;
+  }
+
+  /* Neutralize browser touch :hover/:active/focus persistence. Holding a dot
+     must not enlarge it before a completed tap has selected it. */
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):hover,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):active,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):focus,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):focus-visible {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    transform: translate(-50%, -50%) scale(1) !important;
+    filter: none !important;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence:has(.timeline-dot.is-selected) .timeline-dot:not(.is-selected) {
+    opacity: .48;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot:last-of-type.is-selected {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    transform: translate(-50%, -50%) scale(1.65) !important;
+    transform-origin: 50% 50% !important;
+    opacity: 1 !important;
+    z-index: 14 !important;
+  }
+
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type.is-selected {
+    width: 36px !important;
+    height: 36px !important;
+    transform: translate(-50%, -50%) scale(1.08) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type.is-selected,
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type.is-selected {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-art.timeline-art-mobile-sequence .timeline-dot {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mobile view tabs: ARCHIVE and STATS must be optically identical in type size. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .view-switch .view-button,
+  .view-switch .view-button.active,
+  .view-switch .view-button:not(.active) {
+    font-family: Inter, Arial, sans-serif !important;
+    font-size: 13px !important;
+    font-style: normal !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    letter-spacing: -0.015em !important;
+    text-transform: uppercase !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .view-switch .view-button,
+  .view-switch .view-button.active,
+  .view-switch .view-button:not(.active) {
+    font-size: 13px !important;
+  }
+}
+
+/* HOW BAD DID IT GET?: pull the monthly columns closer to the heading.
+   The chart has a tall internal bar canvas, so heading margin alone is not enough. */
+.monthly-viz-section .viz-heading {
+  margin-bottom: 0 !important;
+}
+
+.monthly-viz-section .monthly-art {
+  margin-top: -42px !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .monthly-viz-section .viz-heading {
+    margin-bottom: 0 !important;
+  }
+
+  .monthly-viz-section .monthly-art {
+    margin-top: -24px !important;
+  }
+}
+
+/* V16 — HOW BAD DID IT GET?: remove the actual internal desktop spacer.
+   A late desktop rule was adding 65px top padding + a 250px bar canvas,
+   which kept the bars visually far from the heading regardless of heading margin. */
+.monthly-viz-section .viz-heading {
+  margin-bottom: 8px !important;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .monthly-viz-section .monthly-art {
+    min-height: 242px !important;
+    margin-top: 0 !important;
+    transform: none !important;
+  }
+
+  .monthly-viz-section .month-column {
+    grid-template-rows: 185px auto !important;
+  }
+
+  .monthly-viz-section .month-bars {
+    padding-top: 0 !important;
+  }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .monthly-viz-section .viz-heading {
+    margin-bottom: 6px !important;
+  }
+
+  .monthly-viz-section .monthly-art {
+    margin-top: 0 !important;
+    transform: none !important;
+  }
+}
