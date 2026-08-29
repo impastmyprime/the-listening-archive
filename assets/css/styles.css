@@ -3514,12 +3514,9 @@
           2.5rem minmax(0, 1fr) 4.5rem !important;
       }
 
-      .song-row:hover .song-title,
-      .song-row:focus-within .song-title {
-        font-size: clamp(1.25rem, 5.6vw, 1.8rem) !important;
-        transform: translateX(4px);
-      }
-
+      /* Mobile/coarse-pointer title sizing is controlled by the canonical
+         mobile rules at the end of this file. Do not resize titles from a
+         synthetic touch :hover/:focus state here. */
       .archive-playing-label {
         display: none;
       }
@@ -4081,7 +4078,7 @@
 
         font-family: Inter, Arial, sans-serif !important;
         font-style: normal !important;
-        font-size: clamp(1rem, 4.35vw, 1.15rem) !important;
+        font-size: 17px !important;
         font-weight: 500 !important;
         line-height: 1.12 !important;
         letter-spacing: -.025em !important;
@@ -4922,21 +4919,10 @@
 
     
     @media (max-width: 560px) {
-      :root {
-        --mobile-song-title-size: clamp(1rem, 4.35vw, 1.15rem);
-      }
-
-      .song-title,
-      .song-row:hover .song-title,
-      .song-row:focus-within .song-title,
-      .song-row:focus-within:not(:hover) .song-title {
-        font-size: var(--mobile-song-title-size) !important;
-      }
-
       .table-head>span:nth-child(1),
       .table-head>span:nth-child(2),
       .table-head>span:nth-child(4) {
-        font-size: calc(var(--mobile-song-title-size) + 1pt) !important;
+        font-size: 18px !important;
         line-height: 1 !important;
       }
     }
@@ -7485,7 +7471,7 @@
         margin-left: 10px !important;
         margin-right: 10px !important;
         padding-left: 12px !important;
-        padding-right: 12px !important;
+        padding-right: 0 !important;
       }
 
       .stats-cards {
@@ -8880,5 +8866,2655 @@
   .monthly-viz-section .monthly-art {
     margin-top: 0 !important;
     transform: none !important;
+  }
+}
+
+/* V17 access-page desktop title alignment:
+   keep the title's bottom aligned with the access field while bringing its
+   visual top down to the 01 / 02 baseline zone. */
+@media (min-width: 901px) {
+  .access-title-form-row .access-title {
+    transform: scaleY(.925) !important;
+    transform-origin: left bottom !important;
+  }
+}
+
+
+
+/* V19 mobile archive row stability.
+   A playing song must not reflow its number/title/artist when selected.
+   Reserve the now-playing indicator slot for every row and neutralize
+   touch-browser hover/focus geometry changes. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row,
+  .song-row:hover,
+  .song-row:focus-within,
+  .song-row.is-playing,
+  .song-row.is-playing:hover,
+  .song-row.is-playing:focus-within {
+    color: var(--ink) !important;
+  }
+
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row:focus-within:not(:hover) .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.is-playing:hover .row-main,
+  .song-row.is-playing:focus-within .row-main {
+    grid-template-columns: 2.25rem minmax(0, 1fr) max-content !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 2px 9px !important;
+    align-items: start !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 11px 0 9px !important;
+    font-size: 14px !important;
+    line-height: normal !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-row .song-number,
+  .song-row:hover .song-number,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within:not(:hover) .song-number,
+  .song-row.is-playing .song-number {
+    grid-column: 1 !important;
+    grid-row: 1 / 3 !important;
+    align-self: start !important;
+    margin: 0 !important;
+    padding: 2px 0 0 !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    font-variant-numeric: tabular-nums !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within:not(:hover) .song-title,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 1.12 !important;
+    letter-spacing: -.025em !important;
+    transform: none !important;
+    transition: color .18s ease !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row.is-playing .song-title-text {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: inherit !important;
+  }
+
+  /* Keep this slot in the layout even when it is not visible. That makes
+     the title use exactly the same width before and after playback starts. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator {
+    display: inline-flex !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 10px !important;
+    min-width: 10px !important;
+    height: 9px !important;
+    flex: 0 0 10px !important;
+    gap: 2px !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    transition: opacity .16s ease !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .song-row .archive-playing-label {
+    display: none !important;
+  }
+
+  .song-row .archive-eq-bars {
+    width: 10px !important;
+    min-width: 10px !important;
+    height: 9px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+  }
+
+  .song-row .archive-eq-bars i {
+    width: 2px !important;
+    height: 7px !important;
+  }
+
+  .song-row .song-artist,
+  .song-row:hover .song-artist,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within:not(:hover) .song-artist,
+  .song-row.is-playing .song-artist,
+  .song-row .song-from,
+  .song-row:hover .song-from,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within:not(:hover) .song-from,
+  .song-row.is-playing .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-date,
+  .song-row:focus-within:not(:hover) .song-date,
+  .song-row.is-playing .song-date {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row:focus-within:not(:hover) .row-main,
+  .song-row.is-playing .row-main {
+    grid-template-columns: 2rem minmax(0, 1fr) max-content !important;
+  }
+}
+
+
+/* V20 mobile archive composition.
+   Playback status lives in the track-number rail instead of consuming title
+   width. Sender and date behave as one stable metadata block, so a wrapped
+   title cannot push the date up/down or separate it from the row. */
+.song-meta {
+  display: contents;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within:not(:hover) .song-title,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row.is-playing .song-title-text {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* A subtle now-playing equalizer sits directly under the track number.
+     Absolute positioning keeps it out of the title flow entirely. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    position: absolute !important;
+    left: 11px !important;
+    top: 27px !important;
+    z-index: 2 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 11px !important;
+    min-width: 11px !important;
+    height: 9px !important;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 1.5px !important;
+    overflow: visible !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(2px) !important;
+    transition: opacity .18s ease, transform .28s cubic-bezier(.22, 1, .36, 1) !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    visibility: visible !important;
+    opacity: .82 !important;
+    transform: translateY(0) !important;
+  }
+
+  .song-row .archive-playing-label {
+    display: none !important;
+  }
+
+  .song-row .archive-eq-bars {
+    width: 11px !important;
+    min-width: 11px !important;
+    height: 9px !important;
+    display: inline-flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    gap: 1.5px !important;
+  }
+
+  .song-row .archive-eq-bars i {
+    width: 2px !important;
+    height: 7px !important;
+    border-radius: 1px !important;
+  }
+
+  /* Right-side metadata remains one compact unit regardless of title height. */
+  .song-row .song-meta,
+  .song-row:hover .song-meta,
+  .song-row:focus-within .song-meta,
+  .song-row.is-playing .song-meta {
+    display: flex !important;
+    grid-column: 3 !important;
+    grid-row: 1 / 3 !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: flex-start !important;
+    align-self: start !important;
+    gap: 5px !important;
+    width: max-content !important;
+    min-width: max-content !important;
+    margin: 0 !important;
+    padding: 2px 0 0 !important;
+  }
+
+  .song-row .song-meta .song-from,
+  .song-row:hover .song-meta .song-from,
+  .song-row:focus-within .song-meta .song-from,
+  .song-row.is-playing .song-meta .song-from,
+  .song-row .song-meta .song-date,
+  .song-row:hover .song-meta .song-date,
+  .song-row:focus-within .song-meta .song-date,
+  .song-row.is-playing .song-meta .song-date {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    justify-self: auto !important;
+    align-self: auto !important;
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    text-align: right !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-row .song-meta .song-from {
+    font-size: 9px !important;
+    opacity: 1 !important;
+  }
+
+  .song-row .song-meta .song-date {
+    font-size: 9px !important;
+    opacity: .72 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator {
+    left: 9px !important;
+  }
+}
+
+/* V21 desktop archive hover alignment.
+   Keep all primary row fields on one true typographic baseline when the
+   song title enlarges, so the track number, title, artist, requester and date
+   read as a single horizontal line rather than vertically drifting. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row .song-number {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .song-row .song-title {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .song-row .song-artist {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  .song-row .song-meta {
+    display: contents !important;
+  }
+
+  .song-row .song-from {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+  }
+
+  .song-row .song-date {
+    grid-column: 5 !important;
+    grid-row: 1 !important;
+  }
+
+  .song-row .mobile-details-toggle {
+    display: none !important;
+  }
+
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main {
+    grid-template-rows: auto !important;
+    align-items: baseline !important;
+  }
+
+  .song-row:hover .song-number,
+  .song-row:hover .song-title,
+  .song-row:hover .song-artist,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    align-self: baseline !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title {
+    line-height: 1 !important;
+  }
+
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .song-row:hover .song-artist,
+  .song-row:focus-within .song-artist {
+    display: block !important;
+    min-height: 0 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .song-row:hover .song-number,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    line-height: 1 !important;
+  }
+}
+
+/* V22 desktop archive: lock primary metadata to one immovable line.
+   Hover may change typography/color, but never the measured row geometry.
+   Bottom-aligning a fixed-height row keeps the title, artist, requester, date
+   and track number visually anchored even when the title font becomes larger. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.is-playing:hover .row-main,
+  .song-row.is-playing:focus-within .row-main {
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    padding: 0 0 11px !important;
+    grid-template-rows: 1fr !important;
+    align-items: end !important;
+    overflow: visible !important;
+    transition: color .18s ease, background-color .18s ease !important;
+  }
+
+  .song-row .song-number,
+  .song-row .song-title,
+  .song-row .song-artist,
+  .song-row .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-number,
+  .song-row:hover .song-title,
+  .song-row:hover .song-artist,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    grid-row: 1 !important;
+    align-self: end !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    transform-origin: left bottom !important;
+  }
+
+  .song-row .song-number,
+  .song-row:hover .song-number,
+  .song-row:focus-within .song-number {
+    opacity: 1 !important;
+    line-height: 1 !important;
+  }
+
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title {
+    min-height: 0 !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text {
+    display: block !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .song-row .song-artist,
+  .song-row:hover .song-artist,
+  .song-row:focus-within .song-artist {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .song-row .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  /* The number now stays in the primary row, so suppress its duplicate in
+     the expanded detail strip on desktop. */
+  .song-row .expanded-number {
+    visibility: hidden !important;
+  }
+}
+
+/* V23 desktop archive stability reset.
+   Keep the primary row's measured typography/layout identical on hover so
+   content never clips or jumps. Hover emphasis comes from the row color/
+   background and expanded detail strip, not from resizing the main fields. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.is-playing:hover .row-main,
+  .song-row.is-playing:focus-within .row-main {
+    height: auto !important;
+    min-height: 54px !important;
+    max-height: none !important;
+    padding: 10px 0 !important;
+    grid-template-columns:
+      3.5rem minmax(0, 2fr) minmax(0, 1.15fr) 5rem var(--date-col-width) !important;
+    grid-template-rows: auto !important;
+    align-items: start !important;
+    overflow: visible !important;
+    font-size: inherit !important;
+    letter-spacing: normal !important;
+    line-height: normal !important;
+    transition: color .18s ease, background-color .18s ease !important;
+  }
+
+  .song-row .song-number,
+  .song-row .song-title,
+  .song-row .song-artist,
+  .song-row .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-number,
+  .song-row:hover .song-title,
+  .song-row:hover .song-artist,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    grid-row: 1 !important;
+    align-self: start !important;
+    margin: 0 !important;
+    transform: none !important;
+    transition: color .18s ease !important;
+  }
+
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title {
+    display: block !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-weight: 500 !important;
+    font-size: 1rem !important;
+    line-height: 1.18 !important;
+    letter-spacing: normal !important;
+    text-align: left !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text {
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    line-height: inherit !important;
+  }
+
+  .song-row .song-artist,
+  .song-row:hover .song-artist,
+  .song-row:focus-within .song-artist {
+    display: block !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    font-size: 1rem !important;
+    line-height: 1.18 !important;
+    letter-spacing: normal !important;
+  }
+
+  .song-row .song-number,
+  .song-row .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-number,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    padding: 2px 0 0 !important;
+    white-space: nowrap !important;
+    line-height: 1.18 !important;
+    letter-spacing: normal !important;
+  }
+
+  /* Keep all five primary fields on the same first line even if a long title
+     or artist wraps below it. */
+  .song-row .song-number { grid-column: 1 !important; }
+  .song-row .song-title { grid-column: 2 !important; }
+  .song-row .song-artist { grid-column: 3 !important; }
+  .song-row .song-from { grid-column: 4 !important; }
+  .song-row .song-date { grid-column: 5 !important; }
+
+  .song-row .song-meta {
+    display: contents !important;
+  }
+
+  .song-row .archive-playing-indicator {
+    display: none !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator {
+    display: none !important;
+  }
+}
+
+/* V24 desktop archive hover typography.
+   Restore the original Instrument Serif hover character without returning to
+   fixed-height/ellipsis clipping. Long song titles remain fully visible and
+   may wrap naturally; the row grows downward as needed. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title {
+    font-family: "Instrument Serif", Georgia, serif !important;
+    font-style: italic !important;
+    font-weight: 400 !important;
+    font-size: clamp(1.45rem, 2.25vw, 2.45rem) !important;
+    line-height: 1.02 !important;
+    letter-spacing: -0.025em !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    transform: none !important;
+  }
+
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    line-height: inherit !important;
+  }
+
+  /* Anchor the metadata to the first line while the serif title is allowed
+     to continue onto additional lines below it. */
+  .song-row:hover .song-number,
+  .song-row:hover .song-artist,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    align-self: start !important;
+  }
+}
+
+/* V25 desktop archive polish.
+   - Restore a stable now-playing waveform beside the title.
+   - Keep the default row vertically centered.
+   - Give the expanded note more breathing room below the title row.
+   The waveform slot is reserved for every desktop row so playback does not
+   change title width or cause a reflow when a song starts. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* Default / non-hovered rows should read as one centered line. */
+  .song-row:not(:hover):not(:focus-within) .row-main,
+  .song-row.is-playing:not(:hover):not(:focus-within) .row-main {
+    align-items: center !important;
+  }
+
+  .song-row:not(:hover):not(:focus-within) .song-number,
+  .song-row:not(:hover):not(:focus-within) .song-title,
+  .song-row:not(:hover):not(:focus-within) .song-artist,
+  .song-row:not(:hover):not(:focus-within) .song-from,
+  .song-row:not(:hover):not(:focus-within) .song-date,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-number,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-title,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-artist,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-from,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-date {
+    align-self: center !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* The title remains fully visible and may wrap. Reserve a small waveform
+     slot so starting playback never shifts or clips the title. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row.is-playing .song-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    overflow: visible !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text,
+  .song-row.is-playing .song-title-text {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator {
+    display: inline-flex !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 16px !important;
+    min-width: 16px !important;
+    height: 12px !important;
+    flex: 0 0 16px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 0 !important;
+    pointer-events: none !important;
+    transition: opacity .18s ease !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .song-row .archive-playing-label {
+    display: none !important;
+  }
+
+  .song-row .archive-eq-bars {
+    width: 14px !important;
+    min-width: 14px !important;
+    height: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 2px !important;
+  }
+
+  .song-row .archive-eq-bars i {
+    width: 2px !important;
+    height: 10px !important;
+  }
+
+  /* Hovered titles keep the restored Instrument Serif styling. The waveform
+     follows the title on the same visual line without affecting wrapping. */
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title {
+    align-items: flex-start !important;
+  }
+
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator {
+    margin-top: .18em !important;
+  }
+
+  /* More separation between the enlarged title row and the note/detail strip. */
+  .song-row:hover .row-expanded,
+  .song-row:focus-within .row-expanded,
+  .song-row.is-playing:hover .row-expanded,
+  .song-row.is-playing:focus-within .row-expanded {
+    padding-top: 14px !important;
+  }
+}
+
+/* V26 desktop archive playing-state polish.
+   Keep a persistent PLAYING + waveform marker after the pointer leaves,
+   restore the detail-strip number beside the note, and add breathing room
+   between the enlarged title row and the note content. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* Reserve the complete playing badge on every row so playback never
+     changes the title width. It is only painted for the active row. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    display: inline-flex !important;
+    width: 76px !important;
+    min-width: 76px !important;
+    height: 14px !important;
+    flex: 0 0 76px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+    pointer-events: none !important;
+    transition: opacity .18s ease !important;
+  }
+
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator {
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .song-row .archive-playing-label,
+  .song-row.is-playing .archive-playing-label {
+    display: inline-block !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+  }
+
+  .song-row .archive-eq-bars,
+  .song-row.is-playing .archive-eq-bars {
+    width: 14px !important;
+    min-width: 14px !important;
+    height: 12px !important;
+    flex: 0 0 14px !important;
+  }
+
+  /* On the serif hover state, keep the playing badge attached to the first
+     title line. Off-hover it remains vertically centered with the default row. */
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    margin-top: .18em !important;
+  }
+
+  .song-row.is-playing:not(:hover):not(:focus-within) .archive-playing-indicator {
+    margin-top: 0 !important;
+  }
+
+  /* Restore the original number position in the expanded note strip. The
+     main-row number fades only while the detail strip is open. */
+  .song-row .expanded-number,
+  .song-row:hover .expanded-number,
+  .song-row:focus-within .expanded-number {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    align-self: start !important;
+    justify-self: start !important;
+    margin: 0 !important;
+    padding: 1px 0 0 !important;
+    line-height: 1.25 !important;
+  }
+
+  .song-row:hover .song-number,
+  .song-row:focus-within .song-number {
+    opacity: 0 !important;
+  }
+
+  .song-row .row-expanded,
+  .song-row:hover .row-expanded,
+  .song-row:focus-within .row-expanded {
+    align-items: start !important;
+  }
+
+  /* More vertical separation between the title block and the note/detail
+     strip. A larger max-height prevents wrapped notes from being squeezed. */
+  .song-row:hover .row-expanded,
+  .song-row:focus-within .row-expanded,
+  .song-row.is-playing:hover .row-expanded,
+  .song-row.is-playing:focus-within .row-expanded {
+    max-height: 160px !important;
+    padding-top: 22px !important;
+    padding-bottom: 16px !important;
+  }
+}
+
+/* V27 desktop archive optical alignment.
+   Instrument Serif has taller vertical metrics than the sans-serif metadata,
+   so center the visible fields optically instead of aligning to a text edge.
+   Keep the persistent playing badge directly beside the song title. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* Both idle and hover states share a true vertical center. This prevents
+     artist / requester / date from appearing pinned to the top or bottom of
+     the larger Instrument Serif title. */
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.is-playing:hover .row-main,
+  .song-row.is-playing:focus-within .row-main {
+    align-items: center !important;
+  }
+
+  .song-row .song-title,
+  .song-row .song-artist,
+  .song-row .song-from,
+  .song-row .song-date,
+  .song-row:hover .song-title,
+  .song-row:hover .song-artist,
+  .song-row:hover .song-from,
+  .song-row:hover .song-date,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within .song-artist,
+  .song-row:focus-within .song-from,
+  .song-row:focus-within .song-date {
+    align-self: center !important;
+  }
+
+  /* Give the serif hover title more air above and below. The row is allowed
+     to grow naturally, so long names remain completely visible. */
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row.is-playing:hover .row-main,
+  .song-row.is-playing:focus-within .row-main {
+    padding-top: 15px !important;
+    padding-bottom: 15px !important;
+  }
+
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text,
+  .song-row.is-playing:hover .song-title-text,
+  .song-row.is-playing:focus-within .song-title-text {
+    padding-top: .16em !important;
+    padding-bottom: .22em !important;
+  }
+
+  /* Do not let the title span consume all free space before the playing
+     badge. The badge now follows the visible name rather than sitting at the
+     far edge of the title column. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title {
+    justify-content: flex-start !important;
+    column-gap: 8px !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  .song-row.is-playing .song-title-text,
+  .song-row.is-playing:hover .song-title-text,
+  .song-row.is-playing:focus-within .song-title-text {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: calc(100% - 78px) !important;
+  }
+
+  /* Hidden rows no longer reserve a 76px blank area. Only the actual playing
+     song paints the badge, keeping it visually attached to its name. */
+  .song-row:not(.is-playing) .archive-playing-indicator,
+  .song-row:not(.is-playing):hover .archive-playing-indicator,
+  .song-row:not(.is-playing):focus-within .archive-playing-indicator {
+    width: 0 !important;
+    min-width: 0 !important;
+    flex-basis: 0 !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    width: auto !important;
+    min-width: max-content !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    align-self: center !important;
+    justify-content: flex-start !important;
+  }
+
+  /* On hover the serif title is optically centered, so the badge should not
+     be nudged upward by the older first-line alignment rule. */
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator,
+  .song-row.is-playing:not(:hover):not(:focus-within) .archive-playing-indicator {
+    margin-top: 0 !important;
+  }
+}
+
+/* V28 desktop archive interaction polish.
+   1) Make the full title grid cell a reliable playback hit target.
+   2) Bottom-align the animated EQ bars with the PLAYING label.
+   Visual typography/layout from V27 remains unchanged. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* The song title is already a real <button> wired to playSong(). Stretch
+     that button across its entire grid cell so clicking anywhere in the
+     song-name column starts the song, not only the painted glyphs. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    justify-self: stretch !important;
+    box-sizing: border-box !important;
+    cursor: pointer !important;
+  }
+
+  /* Keep the larger hit box visually neutral. The content stays where V27
+     placed it; the extra clickable height is transparent space around it. */
+  .song-row:not(:hover):not(:focus-within) .song-title,
+  .song-row.is-playing:not(:hover):not(:focus-within) .song-title {
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
+  }
+
+  /* Align the bottoms of the waveform and PLAYING text. The bars animate
+     upward from a shared bottom edge instead of floating around the label's
+     vertical centre. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    align-items: flex-end !important;
+  }
+
+  .song-row .archive-eq-bars,
+  .song-row.is-playing .archive-eq-bars {
+    align-items: flex-end !important;
+    align-self: flex-end !important;
+    margin-bottom: 0 !important;
+  }
+
+  .song-row .archive-playing-label,
+  .song-row.is-playing .archive-playing-label {
+    align-self: flex-end !important;
+    line-height: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+
+/* V29 desktop archive full-row playback + precise PLAYING/EQ alignment. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* The complete song card is a playback hit area: primary row, metadata,
+     expanded note and otherwise-empty card space. Buttons retain their own
+     interaction semantics through the JS exclusions. */
+  .song-row,
+  .song-row .row-main,
+  .song-row .row-expanded,
+  .song-row .expanded-copy,
+  .song-row .expanded-note {
+    cursor: pointer !important;
+  }
+
+  .song-row .delete-song,
+  .song-row .play-song,
+  .song-row .song-title {
+    cursor: pointer !important;
+  }
+
+  /* Use a single 10px visual rail for both elements, then lift the bars by
+     one optical pixel. Inter's uppercase glyphs do not fill the line box all
+     the way to its mathematical bottom, so flex-end alone still looks low. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    height: 10px !important;
+    min-height: 10px !important;
+    align-items: flex-end !important;
+    gap: 5px !important;
+  }
+
+  .song-row .archive-playing-label,
+  .song-row.is-playing .archive-playing-label {
+    display: block !important;
+    height: 10px !important;
+    line-height: 10px !important;
+    align-self: flex-end !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .song-row .archive-eq-bars,
+  .song-row.is-playing .archive-eq-bars {
+    height: 9px !important;
+    min-height: 9px !important;
+    align-items: flex-end !important;
+    align-self: flex-end !important;
+    margin: 0 !important;
+    transform: translateY(-1px) !important;
+  }
+}
+
+/* V30 final optical EQ adjustment + stable mobile multi-line song rows. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* One more optical pixel upward so the animated bars visually share the
+     same bottom edge as the PLAYING glyphs. */
+  .song-row .archive-eq-bars,
+  .song-row.is-playing .archive-eq-bars {
+    transform: translateY(-2px) !important;
+  }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  /* Keep the title's measured typography identical in every interaction
+     state. A second line adds height naturally; tapping/playing/expanding
+     never changes its font metrics or vertical origin. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within:not(:hover) .song-title,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title,
+  .song-row.mobile-expanded .song-title {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -.025em !important;
+    text-align: left !important;
+    transform: none !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text,
+  .song-row.is-playing .song-title-text,
+  .song-row.mobile-expanded .song-title-text {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    transform: none !important;
+  }
+
+  /* The number belongs to the title row only, so a two-line title centers
+     the number against that title block instead of against title + artist. */
+  .song-row .song-number,
+  .song-row:hover .song-number,
+  .song-row:focus-within .song-number,
+  .song-row:focus-within:not(:hover) .song-number,
+  .song-row.is-playing .song-number,
+  .song-row.mobile-expanded .song-number {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+    justify-self: start !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+
+  /* The note begins at the exact same x-position as the song title:
+     number-column width + the row's 9px column gap. */
+  .song-row .row-expanded,
+  .song-row:hover .row-expanded,
+  .song-row:focus-within .row-expanded,
+  .song-row:focus-within:not(:hover) .row-expanded,
+  .song-row.mobile-expanded .row-expanded {
+    padding-left: calc(2.25rem + 9px) !important;
+  }
+
+  .song-row .expanded-copy,
+  .song-row.mobile-expanded .expanded-copy,
+  .song-row .expanded-note,
+  .song-row.mobile-expanded .expanded-note {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    text-align: left !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-row .row-expanded,
+  .song-row:hover .row-expanded,
+  .song-row:focus-within .row-expanded,
+  .song-row:focus-within:not(:hover) .row-expanded,
+  .song-row.mobile-expanded .row-expanded {
+    padding-left: calc(2rem + 9px) !important;
+  }
+}
+
+/* V32 mobile expanded-note spacing: change vertical breathing room only.
+   Keep the existing horizontal alignment/spacing untouched. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row.mobile-expanded .row-expanded {
+    max-height: 180px !important;
+    padding-top: 12px !important;
+    padding-right: 0 !important;
+    padding-bottom: 12px !important;
+    padding-left: calc(2.25rem + 9px) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-row.mobile-expanded .row-expanded {
+    padding-left: calc(2rem + 9px) !important;
+  }
+}
+
+/* V33 mobile playback indicator + NOTE hit target.
+   Keep the waveform out of the title button so multi-line song names cannot
+   compress or reposition it. NOTE +/- remains a text-sized target only. */
+.mobile-playing-indicator {
+  display: none;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  /* Desktop indicator stays inside the title for desktop only. On mobile use
+     a dedicated grid item in the number rail so title wrapping is irrelevant. */
+  .song-row .archive-playing-indicator,
+  .song-row:hover .archive-playing-indicator,
+  .song-row:focus-within .archive-playing-indicator,
+  .song-row.is-playing .archive-playing-indicator,
+  .song-row.is-playing:hover .archive-playing-indicator,
+  .song-row.is-playing:focus-within .archive-playing-indicator {
+    display: none !important;
+  }
+
+  .song-row .mobile-playing-indicator {
+    display: inline-flex !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: center !important;
+    align-self: center !important;
+    width: 12px !important;
+    min-width: 12px !important;
+    height: 10px !important;
+    margin: 2px 0 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: none !important;
+    transition: opacity .18s ease !important;
+  }
+
+  .song-row.is-playing .mobile-playing-indicator {
+    visibility: visible !important;
+    opacity: .82 !important;
+  }
+
+  .song-row .mobile-playing-indicator .archive-eq-bars,
+  .song-row.is-playing .mobile-playing-indicator .archive-eq-bars {
+    display: inline-flex !important;
+    width: 12px !important;
+    min-width: 12px !important;
+    height: 10px !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .song-row .mobile-playing-indicator .archive-eq-bars i,
+  .song-row.is-playing .mobile-playing-indicator .archive-eq-bars i {
+    display: block !important;
+    flex: 0 0 2px !important;
+    width: 2px !important;
+    min-width: 2px !important;
+    height: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform-origin: center bottom !important;
+  }
+
+  /* NOTE +/- should only be clickable on the painted text, not across the
+     grid span around it. */
+  .song-row .mobile-details-toggle {
+    display: inline-flex !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    max-width: max-content !important;
+    min-height: 0 !important;
+    justify-self: start !important;
+    align-self: start !important;
+    padding: 0 !important;
+    margin-top: 6px !important;
+    line-height: 1 !important;
+    touch-action: manipulation;
+  }
+}
+
+
+/* V34 canonical mobile archive row geometry.
+   This is the single final authority for mobile title metrics and number/wave
+   placement. It deliberately neutralizes legacy hover/focus/touch overrides. */
+.song-number-rail {
+  display: contents;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row,
+  .song-row:hover,
+  .song-row:focus-within,
+  .song-row:active,
+  .song-row.is-playing,
+  .song-row.mobile-expanded {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row:active .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.mobile-expanded .row-main {
+    grid-template-columns: 2.25rem minmax(0, 1fr) max-content !important;
+    grid-template-rows: auto auto auto !important;
+    align-items: start !important;
+  }
+
+  /* Number and waveform are one rail. A wrapped title can grow independently
+     without moving the number or pushing the waveform farther down. */
+  .song-row .song-number-rail,
+  .song-row:hover .song-number-rail,
+  .song-row:focus-within .song-number-rail,
+  .song-row:active .song-number-rail,
+  .song-row.is-playing .song-number-rail,
+  .song-row.mobile-expanded .song-number-rail {
+    display: inline-flex !important;
+    grid-column: 1 !important;
+    grid-row: 1 / 3 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    justify-self: start !important;
+    align-self: start !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 5px !important;
+  }
+
+  .song-row .song-number,
+  .song-row:hover .song-number,
+  .song-row:focus-within .song-number,
+  .song-row:active .song-number,
+  .song-row.is-playing .song-number,
+  .song-row.mobile-expanded .song-number {
+    display: block !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-self: auto !important;
+    justify-self: auto !important;
+    margin: 0 !important;
+    padding: 1px 0 0 !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-size: 10px !important;
+    font-weight: 400 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  /* Mobile title metrics never change on hold, focus, tap, swipe, playback,
+     or note expansion. Long titles simply add another line at the same size. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within:not(:hover) .song-title,
+  .song-row:active .song-title,
+  .song-row .song-title:active,
+  .song-row .song-title:focus,
+  .song-row .song-title:focus-visible,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title,
+  .song-row.mobile-expanded .song-title {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 19.55px !important;
+    letter-spacing: -.025em !important;
+    text-align: left !important;
+    transform: none !important;
+    transition: color .18s ease !important;
+    touch-action: pan-y !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text,
+  .song-row:active .song-title-text,
+  .song-row.is-playing .song-title-text,
+  .song-row.mobile-expanded .song-title-text,
+  .song-row .song-title-text > span:first-child,
+  .song-row:hover .song-title-text > span:first-child,
+  .song-row:focus-within .song-title-text > span:first-child,
+  .song-row:active .song-title-text > span:first-child,
+  .song-row.is-playing .song-title-text > span:first-child,
+  .song-row.mobile-expanded .song-title-text > span:first-child {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 19.55px !important;
+    letter-spacing: -.025em !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  /* The dedicated mobile waves sit immediately below the number rail and
+     never participate in the title's grid row height. */
+  .song-row .mobile-playing-indicator,
+  .song-row:hover .mobile-playing-indicator,
+  .song-row:focus-within .mobile-playing-indicator,
+  .song-row:active .mobile-playing-indicator,
+  .song-row.is-playing .mobile-playing-indicator,
+  .song-row.mobile-expanded .mobile-playing-indicator {
+    display: inline-flex !important;
+    position: static !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-self: center !important;
+    justify-self: auto !important;
+    width: 12px !important;
+    min-width: 12px !important;
+    height: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    transition: opacity .18s ease !important;
+  }
+
+  .song-row.is-playing .mobile-playing-indicator,
+  .song-row.is-playing:hover .mobile-playing-indicator,
+  .song-row.is-playing:focus-within .mobile-playing-indicator,
+  .song-row.is-playing:active .mobile-playing-indicator {
+    visibility: visible !important;
+    opacity: .82 !important;
+  }
+
+  .song-row .mobile-playing-indicator .archive-eq-bars,
+  .song-row.is-playing .mobile-playing-indicator .archive-eq-bars {
+    display: inline-flex !important;
+    width: 12px !important;
+    min-width: 12px !important;
+    height: 10px !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .song-row .mobile-playing-indicator .archive-eq-bars i,
+  .song-row.is-playing .mobile-playing-indicator .archive-eq-bars i {
+    flex: 0 0 2px !important;
+    width: 2px !important;
+    min-width: 2px !important;
+    height: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform-origin: center bottom !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-row .row-main,
+  .song-row:hover .row-main,
+  .song-row:focus-within .row-main,
+  .song-row:active .row-main,
+  .song-row.is-playing .row-main,
+  .song-row.mobile-expanded .row-main {
+    grid-template-columns: 2rem minmax(0, 1fr) max-content !important;
+  }
+}
+
+/* V36 mobile stability patch — preserve V34 layout exactly.
+   Only interaction typography and number alignment are adjusted. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row,
+  .song-row:hover,
+  .song-row:focus-within,
+  .song-row:active,
+  .song-row.is-playing,
+  .song-row.mobile-expanded {
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+  }
+
+  /* Touch browsers may synthesize hover/focus while holding or swiping.
+     Keep the title metrics identical in every possible mobile state. */
+  .song-row .song-title,
+  .song-row:hover .song-title,
+  .song-row:focus-within .song-title,
+  .song-row:focus-within:not(:hover) .song-title,
+  .song-row:active .song-title,
+  .song-row .song-title:hover,
+  .song-row .song-title:active,
+  .song-row .song-title:focus,
+  .song-row .song-title:focus-visible,
+  .song-row.is-playing .song-title,
+  .song-row.is-playing:hover .song-title,
+  .song-row.is-playing:focus-within .song-title,
+  .song-row.is-playing:active .song-title,
+  .song-row.mobile-expanded .song-title,
+  .song-row.mobile-expanded:hover .song-title,
+  .song-row.mobile-expanded:focus-within .song-title,
+  .song-row.mobile-expanded:active .song-title {
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 19.55px !important;
+    letter-spacing: -.025em !important;
+    transform: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .song-row .song-title-text,
+  .song-row:hover .song-title-text,
+  .song-row:focus-within .song-title-text,
+  .song-row:active .song-title-text,
+  .song-row.is-playing .song-title-text,
+  .song-row.is-playing:hover .song-title-text,
+  .song-row.is-playing:focus-within .song-title-text,
+  .song-row.mobile-expanded .song-title-text,
+  .song-row.mobile-expanded:hover .song-title-text,
+  .song-row.mobile-expanded:focus-within .song-title-text,
+  .song-row .song-title-text > span:first-child,
+  .song-row:hover .song-title-text > span:first-child,
+  .song-row:focus-within .song-title-text > span:first-child,
+  .song-row:active .song-title-text > span:first-child,
+  .song-row.is-playing .song-title-text > span:first-child,
+  .song-row.mobile-expanded .song-title-text > span:first-child {
+    font-family: Inter, Arial, sans-serif !important;
+    font-style: normal !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    line-height: 19.55px !important;
+    letter-spacing: -.025em !important;
+    transform: none !important;
+  }
+
+  /* Preserve V34's number+wave rail. For one-line titles the rail is moved
+     only enough to optically center the number on that line. Wrapped titles
+     keep the rail at the top so the number aligns with the first line. */
+  .song-row .song-number-rail,
+  .song-row:hover .song-number-rail,
+  .song-row:focus-within .song-number-rail,
+  .song-row:active .song-number-rail,
+  .song-row.is-playing .song-number-rail,
+  .song-row.mobile-expanded .song-number-rail {
+    transform: translateY(4.8px) !important;
+  }
+
+  .song-row.is-title-multiline .song-number-rail,
+  .song-row.is-title-multiline:hover .song-number-rail,
+  .song-row.is-title-multiline:focus-within .song-number-rail,
+  .song-row.is-title-multiline:active .song-number-rail,
+  .song-row.is-title-multiline.is-playing .song-number-rail,
+  .song-row.is-title-multiline.mobile-expanded .song-number-rail {
+    transform: translateY(0) !important;
+  }
+}
+
+/* V37 mobile expanded-song spacing.
+   Keep the V36 grid/typography intact; only bring the expanded note and
+   playback/delete actions slightly closer to the song title. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-row.mobile-expanded .row-expanded {
+    padding-top: 8px !important;
+    align-items: start !important;
+  }
+
+  .song-row.mobile-expanded .expanded-actions {
+    align-self: start !important;
+  }
+}
+
+/* V38 mobile toolbar optical centering.
+   Keep layout/spacing intact; make all four visible controls share one vertical center. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .toolbar {
+    align-items: center !important;
+  }
+
+  .view-switch,
+  .nav-actions {
+    align-self: center !important;
+    align-items: center !important;
+  }
+
+  .view-switch .view-button,
+  .view-switch .view-button.active,
+  .view-switch .view-button:not(.active),
+  .nav-actions .nav-action {
+    box-sizing: border-box !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .view-switch .view-button::after {
+    bottom: 2px !important;
+  }
+}
+
+
+/* V39: shorter mobile bottom player while preserving all playback controls. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .player-bar {
+    grid-template-columns: minmax(0, 1fr) 30px !important;
+    grid-template-rows: auto 112px !important;
+    gap: 5px !important;
+    padding: 6px var(--pad) 7px !important;
+    max-height: min(40svh, 210px) !important;
+    overflow-y: auto !important;
+  }
+
+  .player-copy {
+    min-height: 0 !important;
+    gap: 1px !important;
+    padding: 0 !important;
+  }
+
+  #playerTitle {
+    font-size: clamp(1.12rem, 5.4vw, 1.42rem) !important;
+    line-height: 1 !important;
+    padding: 0 !important;
+  }
+
+  #playerArtist {
+    line-height: 1 !important;
+  }
+
+  .source-tabs {
+    margin-top: 3px !important;
+    gap: 3px !important;
+  }
+
+  .source-tab {
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+  }
+
+  .media-embed,
+  .media-embed.youtube-mode,
+  .media-embed.spotify-mode,
+  .youtube-player-mount {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    height: 112px !important;
+    min-height: 112px !important;
+    max-height: 112px !important;
+  }
+
+  .media-embed iframe,
+  .media-embed.youtube-mode iframe,
+  .media-embed.spotify-mode iframe,
+  .youtube-player-mount iframe {
+    height: 112px !important;
+    min-height: 112px !important;
+    max-height: 112px !important;
+  }
+
+  body.player-open {
+    padding-bottom: 180px !important;
+  }
+}
+
+/* V40: give the compact mobile player copy/source area a little more breathing room. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .player-bar {
+    gap: 7px !important;
+    padding-top: 7px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .player-copy {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+  }
+
+  .source-tabs {
+    margin-top: 4px !important;
+    margin-bottom: 1px !important;
+  }
+}
+
+
+/* V41 mobile long-press typography hardening.
+   Prevent touch callouts/text selection from visually magnifying a title,
+   and use one font shorthand as the final authority for every interaction
+   state. No grid, spacing, note, number, or waveform geometry is changed. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-list,
+  .song-list .song-row,
+  .song-list .song-row .row-main,
+  .song-list .song-row .song-title,
+  .song-list .song-row .song-title-text {
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+
+  .song-list .song-row .song-title,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:focus-within .song-title,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row .song-title:hover,
+  .song-list .song-row .song-title:focus,
+  .song-list .song-row .song-title:focus-visible,
+  .song-list .song-row .song-title:active,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.is-playing:hover .song-title,
+  .song-list .song-row.is-playing:focus-within .song-title,
+  .song-list .song-row.is-playing:active .song-title,
+  .song-list .song-row.mobile-expanded .song-title,
+  .song-list .song-row.mobile-expanded:hover .song-title,
+  .song-list .song-row.mobile-expanded:focus-within .song-title,
+  .song-list .song-row.mobile-expanded:active .song-title {
+    font: normal 500 17px/19.55px Inter, Arial, sans-serif !important;
+    font-optical-sizing: none !important;
+    letter-spacing: -.025em !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: color .18s ease !important;
+  }
+
+  .song-list .song-row .song-title-text,
+  .song-list .song-row:hover .song-title-text,
+  .song-list .song-row:focus-within .song-title-text,
+  .song-list .song-row:active .song-title-text,
+  .song-list .song-row.is-playing .song-title-text,
+  .song-list .song-row.mobile-expanded .song-title-text,
+  .song-list .song-row .song-title-text > span:first-child,
+  .song-list .song-row:hover .song-title-text > span:first-child,
+  .song-list .song-row:focus-within .song-title-text > span:first-child,
+  .song-list .song-row:active .song-title-text > span:first-child,
+  .song-list .song-row.is-playing .song-title-text > span:first-child,
+  .song-list .song-row.mobile-expanded .song-title-text > span:first-child {
+    font: inherit !important;
+    font-optical-sizing: none !important;
+    letter-spacing: inherit !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: none !important;
+  }
+}
+
+
+/* V43: final mobile song-title reset and exact desktop DATE edge. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  /* Reset the button itself instead of fighting older :hover/:focus rules.
+     This makes touch-hold, swipe, click, playback and NOTE toggling use the
+     exact same measured typography. */
+  .song-list .song-row .song-title,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:focus-within .song-title,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row .song-title:hover,
+  .song-list .song-row .song-title:focus,
+  .song-list .song-row .song-title:focus-visible,
+  .song-list .song-row .song-title:active,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.is-playing:hover .song-title,
+  .song-list .song-row.is-playing:focus-within .song-title,
+  .song-list .song-row.is-playing:active .song-title,
+  .song-list .song-row.mobile-expanded .song-title,
+  .song-list .song-row.mobile-expanded:hover .song-title,
+  .song-list .song-row.mobile-expanded:focus-within .song-title,
+  .song-list .song-row.mobile-expanded:active .song-title {
+    all: unset !important;
+    box-sizing: border-box !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: var(--ink) !important;
+    background: transparent !important;
+    border: 0 !important;
+    font: normal 500 17px/19.55px Inter, Arial, sans-serif !important;
+    font-optical-sizing: none !important;
+    font-size-adjust: none !important;
+    font-synthesis: none !important;
+    letter-spacing: -.025em !important;
+    text-align: left !important;
+    text-transform: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    scale: 1 !important;
+    zoom: 1 !important;
+    transition: none !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: pan-y !important;
+    cursor: pointer !important;
+    outline: none !important;
+  }
+
+  .song-list .song-row .song-title-text,
+  .song-list .song-row:hover .song-title-text,
+  .song-list .song-row:focus-within .song-title-text,
+  .song-list .song-row:active .song-title-text,
+  .song-list .song-row.is-playing .song-title-text,
+  .song-list .song-row.mobile-expanded .song-title-text {
+    all: unset !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font: inherit !important;
+    font-optical-sizing: none !important;
+    font-synthesis: none !important;
+    letter-spacing: inherit !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row .song-title-text > span:first-child,
+  .song-list .song-row .song-title-text > .script-size-adjust,
+  .song-list .song-row:hover .song-title-text > span:first-child,
+  .song-list .song-row:focus-within .song-title-text > span:first-child,
+  .song-list .song-row:active .song-title-text > span:first-child,
+  .song-list .song-row.is-playing .song-title-text > span:first-child,
+  .song-list .song-row.mobile-expanded .song-title-text > span:first-child {
+    font: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    letter-spacing: inherit !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row .row-main,
+  .song-list .song-row:hover .row-main,
+  .song-list .song-row:focus-within .row-main,
+  .song-list .song-row:active .row-main,
+  .song-list .song-row.is-playing .row-main,
+  .song-list .song-row.mobile-expanded .row-main {
+    font-size: 14px !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* DATE is taken out of grid alignment math and pinned to the exact same
+   right content edge used by the sticky toolbar / + ADD SONG button. */
+@media (min-width: 851px) {
+  .archive .table-head {
+    position: relative !important;
+  }
+
+  .archive .table-head > span:nth-child(5) {
+    position: absolute !important;
+    right: 0 !important;
+    top: 50% !important;
+    width: max-content !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: right !important;
+    transform: translateY(-50%) !important;
+  }
+}
+
+/* V44 mobile archive interaction firewall.
+   Mobile browsers synthesize :hover/:focus/:active while a finger is held or
+   dragged. Older desktop archive rules alter row height, padding and metadata
+   metrics in those states. Lock the ENTIRE mobile row to one geometry so
+   press/hold/swipe/play/note interactions cannot resize or move its text. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  html,
+  body,
+  .song-list,
+  .song-list .song-row,
+  .song-list .song-row .row-main {
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+  }
+
+  .song-list .song-row,
+  .song-list .song-row:hover,
+  .song-list .song-row:focus-within,
+  .song-list .song-row:active,
+  .song-list .song-row.is-playing,
+  .song-list .song-row.is-playing:hover,
+  .song-list .song-row.is-playing:focus-within,
+  .song-list .song-row.mobile-expanded,
+  .song-list .song-row.mobile-expanded:hover,
+  .song-list .song-row.mobile-expanded:focus-within {
+    color: var(--ink) !important;
+    background: transparent !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row::before,
+  .song-list .song-row:hover::before,
+  .song-list .song-row:focus-within::before,
+  .song-list .song-row:active::before,
+  .song-list .song-row.is-playing::before,
+  .song-list .song-row.is-playing:hover::before,
+  .song-list .song-row.is-playing:focus-within::before {
+    background: transparent !important;
+    transform: none !important;
+  }
+
+  /* This is the single authoritative mobile main-row geometry. */
+  .song-list .song-row .row-main,
+  .song-list .song-row:hover .row-main,
+  .song-list .song-row:focus-within .row-main,
+  .song-list .song-row:focus-within:not(:hover) .row-main,
+  .song-list .song-row:active .row-main,
+  .song-list .song-row.is-playing .row-main,
+  .song-list .song-row.is-playing:hover .row-main,
+  .song-list .song-row.is-playing:focus-within .row-main,
+  .song-list .song-row.mobile-expanded .row-main,
+  .song-list .song-row.mobile-expanded:hover .row-main,
+  .song-list .song-row.mobile-expanded:focus-within .row-main {
+    display: grid !important;
+    grid-template-columns: 2.25rem minmax(0, 1fr) max-content !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 2px 9px !important;
+    align-items: start !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 11px 0 9px !important;
+    overflow: visible !important;
+    font-size: 14px !important;
+    line-height: normal !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: none !important;
+  }
+
+  /* Title geometry and type never change, including native/synthetic states. */
+  .song-list .song-row .song-title,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:focus-within .song-title,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row .song-title:hover,
+  .song-list .song-row .song-title:focus,
+  .song-list .song-row .song-title:focus-visible,
+  .song-list .song-row .song-title:active,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.is-playing:hover .song-title,
+  .song-list .song-row.is-playing:focus-within .song-title,
+  .song-list .song-row.mobile-expanded .song-title,
+  .song-list .song-row.mobile-expanded:hover .song-title,
+  .song-list .song-row.mobile-expanded:focus-within .song-title {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: block !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--ink) !important;
+    font: normal 500 17px/19.55px Inter, Arial, sans-serif !important;
+    font-optical-sizing: none !important;
+    font-synthesis: none !important;
+    letter-spacing: -.025em !important;
+    text-align: left !important;
+    text-transform: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    scale: 1 !important;
+    zoom: 1 !important;
+    transition: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: pan-y !important;
+    outline: none !important;
+  }
+
+  .song-list .song-row .song-title-text,
+  .song-list .song-row:hover .song-title-text,
+  .song-list .song-row:focus-within .song-title-text,
+  .song-list .song-row:active .song-title-text,
+  .song-list .song-row.is-playing .song-title-text,
+  .song-list .song-row.mobile-expanded .song-title-text,
+  .song-list .song-row .song-title-text > span,
+  .song-list .song-row:hover .song-title-text > span,
+  .song-list .song-row:focus-within .song-title-text > span,
+  .song-list .song-row:active .song-title-text > span,
+  .song-list .song-row.is-playing .song-title-text > span,
+  .song-list .song-row.mobile-expanded .song-title-text > span {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font: normal 500 17px/19.55px Inter, Arial, sans-serif !important;
+    font-optical-sizing: none !important;
+    font-synthesis: none !important;
+    letter-spacing: -.025em !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: none !important;
+  }
+
+  /* Lock all neighboring metadata too; older hover rules used different
+     line-heights/padding and made the row appear to jump around the title. */
+  .song-list .song-row .song-artist,
+  .song-list .song-row:hover .song-artist,
+  .song-list .song-row:focus-within .song-artist,
+  .song-list .song-row:active .song-artist,
+  .song-list .song-row.is-playing .song-artist,
+  .song-list .song-row.mobile-expanded .song-artist {
+    display: block !important;
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    align-self: start !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 3px 0 0 !important;
+    font: normal 400 11px/1.12 Inter, Arial, sans-serif !important;
+    letter-spacing: -.01em !important;
+    opacity: .72 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row .song-from,
+  .song-list .song-row:hover .song-from,
+  .song-list .song-row:focus-within .song-from,
+  .song-list .song-row:active .song-from,
+  .song-list .song-row.is-playing .song-from,
+  .song-list .song-row.mobile-expanded .song-from {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    align-self: start !important;
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 2px 0 0 !important;
+    font: normal 400 9px/1 Inter, Arial, sans-serif !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row .song-date,
+  .song-list .song-row:hover .song-date,
+  .song-list .song-row:focus-within .song-date,
+  .song-list .song-row:active .song-date,
+  .song-list .song-row.is-playing .song-date,
+  .song-list .song-row.mobile-expanded .song-date {
+    display: block !important;
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    align-self: end !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 3px 0 0 !important;
+    font: normal 400 9px/1 Inter, Arial, sans-serif !important;
+    letter-spacing: 0 !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    opacity: .72 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row .mobile-details-toggle,
+  .song-list .song-row:hover .mobile-details-toggle,
+  .song-list .song-row:focus-within .mobile-details-toggle,
+  .song-list .song-row:active .mobile-details-toggle,
+  .song-list .song-row.mobile-expanded .mobile-details-toggle {
+    display: inline-block !important;
+    grid-column: 2 / 4 !important;
+    grid-row: 3 !important;
+    justify-self: start !important;
+    align-self: start !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 6px 0 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    font: normal 600 9px/1 Inter, Arial, sans-serif !important;
+    letter-spacing: .03em !important;
+    text-transform: uppercase !important;
+    transform: none !important;
+    transition: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  /* Desktop playing badge never participates in the mobile title width. */
+  .song-list .song-row .archive-playing-indicator,
+  .song-list .song-row:hover .archive-playing-indicator,
+  .song-list .song-row:focus-within .archive-playing-indicator,
+  .song-list .song-row.is-playing .archive-playing-indicator {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Only NOTE state may open the detail row; synthetic touch hover/focus may
+     never change its height or padding. */
+  .song-list .song-row .row-expanded,
+  .song-list .song-row:hover .row-expanded,
+  .song-list .song-row:focus-within .row-expanded,
+  .song-list .song-row:focus-within:not(:hover) .row-expanded,
+  .song-list .song-row:active .row-expanded,
+  .song-list .song-row.is-playing .row-expanded {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 9px !important;
+    align-items: start !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 0 0 calc(2.25rem + 9px) !important;
+    transform: none !important;
+    transition: max-height .22s ease, opacity .16s ease !important;
+  }
+
+  .song-list .song-row.mobile-expanded .row-expanded,
+  .song-list .song-row.mobile-expanded:hover .row-expanded,
+  .song-list .song-row.mobile-expanded:focus-within .row-expanded,
+  .song-list .song-row.mobile-expanded:active .row-expanded {
+    max-height: 180px !important;
+    opacity: 1 !important;
+    padding: 8px 0 12px calc(2.25rem + 9px) !important;
+  }
+
+  /* Preserve the requested number behavior: centered for one-line titles,
+     first-line aligned for wrapped titles; waves remain directly below it. */
+  .song-list .song-row .song-number-rail,
+  .song-list .song-row:hover .song-number-rail,
+  .song-list .song-row:focus-within .song-number-rail,
+  .song-list .song-row:active .song-number-rail,
+  .song-list .song-row.is-playing .song-number-rail,
+  .song-list .song-row.mobile-expanded .song-number-rail {
+    display: inline-flex !important;
+    grid-column: 1 !important;
+    grid-row: 1 / 3 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    justify-self: start !important;
+    align-self: start !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 5px !important;
+    transform: translateY(4.8px) !important;
+    transition: none !important;
+  }
+
+  .song-list .song-row.is-title-multiline .song-number-rail,
+  .song-list .song-row.is-title-multiline:hover .song-number-rail,
+  .song-list .song-row.is-title-multiline:focus-within .song-number-rail,
+  .song-list .song-row.is-title-multiline:active .song-number-rail,
+  .song-list .song-row.is-title-multiline.is-playing .song-number-rail,
+  .song-list .song-row.is-title-multiline.mobile-expanded .song-number-rail {
+    transform: translateY(0) !important;
+  }
+
+  .song-list .song-row .song-number,
+  .song-list .song-row:hover .song-number,
+  .song-list .song-row:focus-within .song-number,
+  .song-list .song-row:active .song-number,
+  .song-list .song-row.is-playing .song-number,
+  .song-list .song-row.mobile-expanded .song-number {
+    display: block !important;
+    margin: 0 !important;
+    padding: 1px 0 0 !important;
+    font: normal 400 10px/1 Inter, Arial, sans-serif !important;
+    letter-spacing: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-list .song-row .row-main,
+  .song-list .song-row:hover .row-main,
+  .song-list .song-row:focus-within .row-main,
+  .song-list .song-row:active .row-main,
+  .song-list .song-row.is-playing .row-main,
+  .song-list .song-row.mobile-expanded .row-main {
+    grid-template-columns: 2rem minmax(0, 1fr) max-content !important;
+  }
+
+  .song-list .song-row .row-expanded,
+  .song-list .song-row:hover .row-expanded,
+  .song-list .song-row:focus-within .row-expanded,
+  .song-list .song-row:active .row-expanded,
+  .song-list .song-row.mobile-expanded .row-expanded {
+    padding-left: calc(2rem + 9px) !important;
+  }
+}
+
+
+/* V45: eliminate the remaining intermittent mobile song-row shift.
+   A NEW marker used to be removed on first play, which could re-wrap the
+   title at the exact moment playback began. Keep its layout box until the
+   next full render, but hide it visually after it is read. */
+.latest-song-marker.is-read-placeholder {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  /* Freeze the visible title line box during play/read transitions. */
+  .song-list .song-row .song-title,
+  .song-list .song-row .song-title-text,
+  .song-list .song-row .song-title-text > span:first-child,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row:focus-within .song-title,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.mobile-expanded .song-title {
+    font: normal 500 17px/19.55px Inter, Arial, sans-serif !important;
+    letter-spacing: -.025em !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* V46: compact mobile NEW badge beside the song title.
+   The title owns a flexible capped frame so wrapped names always leave room
+   for the badge. One-line titles center the badge; wrapped titles top-align it. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-list .song-row.is-new .song-title-text,
+  .song-list .song-row.is-new:hover .song-title-text,
+  .song-list .song-row.is-new:focus-within .song-title-text,
+  .song-list .song-row.is-new:active .song-title-text,
+  .song-list .song-row.is-new.is-playing .song-title-text,
+  .song-list .song-row.is-new.mobile-expanded .song-title-text {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .song-list .song-row.is-new .song-title-text > span:first-child,
+  .song-list .song-row.is-new:hover .song-title-text > span:first-child,
+  .song-list .song-row.is-new:focus-within .song-title-text > span:first-child,
+  .song-list .song-row.is-new:active .song-title-text > span:first-child,
+  .song-list .song-row.is-new.is-playing .song-title-text > span:first-child,
+  .song-list .song-row.is-new.mobile-expanded .song-title-text > span:first-child {
+    display: block !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 31px) !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .song-list .song-row.is-new .latest-song-marker,
+  .song-list .song-row.is-new:hover .latest-song-marker,
+  .song-list .song-row.is-new:focus-within .latest-song-marker,
+  .song-list .song-row.is-new:active .latest-song-marker,
+  .song-list .song-row.is-new.is-playing .latest-song-marker,
+  .song-list .song-row.is-new.mobile-expanded .latest-song-marker {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    align-self: center !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 1px !important;
+    font: normal 600 7px/1 Inter, Arial, sans-serif !important;
+    letter-spacing: .045em !important;
+    white-space: nowrap !important;
+    opacity: .72 !important;
+    transform: none !important;
+  }
+
+  .song-list .song-row.is-title-multiline.is-new .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:hover .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:focus-within .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:active .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new.is-playing .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new.mobile-expanded .song-title-text {
+    align-items: flex-start !important;
+  }
+
+  .song-list .song-row.is-title-multiline.is-new .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:hover .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:focus-within .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:active .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new.is-playing .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new.mobile-expanded .latest-song-marker {
+    align-self: flex-start !important;
+    margin-top: 3px !important;
+  }
+
+  .song-list .song-row.is-new .latest-song-marker-icon {
+    width: 6px !important;
+    height: 6px !important;
+    flex: 0 0 6px !important;
+    transform: none !important;
+  }
+}
+
+
+
+
+/* V49 — desktop archive header alignment cleanup. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  /* Keep DATE inside the same five-column grid as every song row.
+     Both the DATE header and date values start at the exact same left edge. */
+  .archive .table-head {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns:
+      3.5rem minmax(0, 2fr) minmax(0, 1.15fr) 5rem var(--date-col-width) !important;
+    gap: 12px !important;
+  }
+
+  .archive .table-head > span:nth-child(5) {
+    position: static !important;
+    grid-column: 5 !important;
+    width: var(--date-col-width) !important;
+    justify-self: stretch !important;
+    text-align: left !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .archive .song-row .song-date,
+  .archive .song-row:hover .song-date,
+  .archive .song-row:focus-within .song-date,
+  .archive .song-row.is-playing .song-date {
+    grid-column: 5 !important;
+    width: var(--date-col-width) !important;
+    justify-self: stretch !important;
+    text-align: left !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* ARTIST uses the same weight as the other desktop column titles. */
+  .archive .table-head > span:nth-child(3) {
+    font-weight: 600 !important;
+  }
+}
+
+
+/* V52 — canonical desktop archive grid.
+   One shared column definition for the table header and every song-row state
+   prevents DATE/header drift caused by older hover/responsive overrides. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .archive {
+    --archive-desktop-columns:
+      3.5rem minmax(0, 2fr) minmax(0, 1.15fr) 5rem 54px;
+  }
+
+  .archive .table-head,
+  .archive .song-row .row-main,
+  .archive .song-row:hover .row-main,
+  .archive .song-row:focus-within .row-main,
+  .archive .song-row.is-playing .row-main,
+  .archive .song-row.is-playing:hover .row-main,
+  .archive .song-row.is-playing:focus-within .row-main {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: var(--archive-desktop-columns) !important;
+    column-gap: 12px !important;
+  }
+
+  .archive .table-head > span:nth-child(5),
+  .archive .song-row .song-date,
+  .archive .song-row:hover .song-date,
+  .archive .song-row:focus-within .song-date,
+  .archive .song-row.is-playing .song-date,
+  .archive .song-row.is-playing:hover .song-date,
+  .archive .song-row.is-playing:focus-within .song-date {
+    position: static !important;
+    grid-column: 5 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 54px !important;
+    justify-self: start !important;
+    align-self: center !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    text-align: left !important;
+    transform: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+  }
+
+  /* Keep ARTIST consistent with the other archive column labels. */
+  .archive .table-head > span:nth-child(3) {
+    font-weight: 600 !important;
+  }
+}
+
+/* V53: vertically center playback-source labels in the compact mobile player. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .player-bar .source-tab {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    text-align: center !important;
+  }
+}
+
+
+/* V54: optical centering for the compact mobile playback-source label.
+   Uppercase glyphs look slightly high even when the button is flex-centered,
+   so nudge only the text—not the button box—down by 1px. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .player-bar .source-tab {
+    min-height: 20px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .player-bar .source-tab-label {
+    display: block !important;
+    line-height: 1 !important;
+    transform: translateY(1px) !important;
+    pointer-events: none !important;
+  }
+}
+
+/* V55 — desktop archive cursor consistency.
+   The site-wide custom cursor hides the native cursor on fine pointers.
+   Some later archive hit-area rules reintroduced `cursor: pointer !important`,
+   which won the cascade and exposed the browser cursor over song rows.
+   Keep the entire clickable song card on the custom cursor instead. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row,
+  .song-row *,
+  .song-row *::before,
+  .song-row *::after,
+  .song-row::before,
+  .song-row::after,
+  .song-row:hover,
+  .song-row:focus-within,
+  .song-row.is-playing {
+    cursor: none !important;
+  }
+}
+
+/* V56 — hard-stop the native cursor over desktop archive rows.
+   Older high-specificity !important cursor:pointer rules can beat generic
+   cursor:none selectors. Scope this to #songList and the active custom-cursor
+   root so every descendant and pseudo-element is forced to the custom cursor. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  html.custom-cursor-active body #songList.song-list .song-row,
+  html.custom-cursor-active body #songList.song-list .song-row *,
+  html.custom-cursor-active body #songList.song-list .song-row::before,
+  html.custom-cursor-active body #songList.song-list .song-row::after,
+  html.custom-cursor-active body #songList.song-list .song-row *::before,
+  html.custom-cursor-active body #songList.song-list .song-row *::after,
+  html.custom-cursor-active body #songList.song-list .song-row:hover,
+  html.custom-cursor-active body #songList.song-list .song-row:focus-within,
+  html.custom-cursor-active body #songList.song-list .song-row.is-playing {
+    cursor: none !important;
   }
 }

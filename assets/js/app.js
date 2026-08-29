@@ -493,6 +493,7 @@ function syncPixelToolButtons() {
   const eraserActive =
     showActiveState && pixelActiveTool === "eraser";
 
+
   pixelBrushTool.classList.toggle(
     "is-active",
     brushActive
@@ -508,6 +509,7 @@ function syncPixelToolButtons() {
     eraserActive
   );
 
+
   pixelBrushTool.setAttribute(
     "aria-pressed",
     brushActive ? "true" : "false"
@@ -522,6 +524,7 @@ function syncPixelToolButtons() {
     "aria-pressed",
     eraserActive ? "true" : "false"
   );
+
 }
 
 function setPixelTool(tool) {
@@ -563,6 +566,7 @@ function setPixelColor(color) {
   pixelCustomColor.value = pixelActiveColor;
   setPixelTool("brush");
 }
+
 
 
 function pixelsMatchForFill(a, b) {
@@ -867,6 +871,8 @@ async function loadPixelBoard() {
 }
 
 
+
+
 pixelBrushTool.addEventListener("click", () => {
   setPixelTool("brush");
   armPixelTouchDrawing();
@@ -882,6 +888,8 @@ pixelEraserTool.addEventListener("click", () => {
   armPixelTouchDrawing();
 });
 
+
+
 pixelSwatches.addEventListener("click", event => {
   const button = event.target.closest(".pixel-swatch");
 
@@ -893,6 +901,8 @@ pixelSwatches.addEventListener("click", event => {
   armPixelTouchDrawing();
 });
 
+
+
 pixelCustomColor.addEventListener("input", event => {
   setPixelColor(event.target.value);
   armPixelTouchDrawing();
@@ -900,6 +910,7 @@ pixelCustomColor.addEventListener("input", event => {
 
 setPixelTool("brush");
 setPixelColor("#E7FE00");
+
 
 pixelBoardStage.addEventListener("pointerdown", event => {
   if (!pixelBoardReady) return;
@@ -917,6 +928,7 @@ pixelBoardStage.addEventListener("pointerdown", event => {
 
   const point =
     pixelCoordinatesFromEvent(event);
+
 
   if (pixelActiveTool === "fill") {
     floodFillPixels(point.x, point.y);
@@ -1201,7 +1213,10 @@ function removeNewMarkerFromSongDom(songId) {
   document.querySelectorAll(".song-row").forEach(row => {
     if (String(row.dataset.id || "") !== id) return;
     row.classList.remove("is-new");
-    row.querySelectorAll(".latest-song-marker").forEach(marker => marker.remove());
+    row.querySelectorAll(".latest-song-marker").forEach(marker => {
+      marker.classList.add("is-read-placeholder");
+      marker.setAttribute("aria-hidden", "true");
+    });
   });
 }
 
@@ -2274,7 +2289,10 @@ function renderSourceTabs(song, activeSource) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `source-tab${source.key === activeSource ? " active" : ""}`;
-    button.textContent = source.label;
+    const label = document.createElement("span");
+    label.className = "source-tab-label";
+    label.textContent = source.label;
+    button.appendChild(label);
     button.addEventListener("click", () => playSong(song, source.key));
     sourceTabs.appendChild(button);
   });
@@ -2415,6 +2433,72 @@ function scriptAwareHtml(value) {
   return `<span${className}>${escapeHtml(value)}</span>`;
 }
 
+const mobileSongLayoutQuery = window.matchMedia(
+  "(max-width: 768px), (hover: none) and (pointer: coarse)"
+);
+
+// Mobile browsers can synthesize hover/focus and show a text-selection
+// magnifier/callout during a long press. Keep those browser-native effects
+// from changing the perceived title size while preserving normal tap/scroll.
+["contextmenu", "selectstart", "dragstart"].forEach(type => {
+  songList?.addEventListener(type, event => {
+    if (!mobileSongLayoutQuery.matches) return;
+    if (!event.target.closest(".song-row")) return;
+    event.preventDefault();
+  });
+});
+
+["pointerup", "pointercancel"].forEach(type => {
+  songList?.addEventListener(type, event => {
+    if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
+    event.target.closest(".song-row")?.querySelector(".song-title")?.blur();
+  }, { passive: true });
+});
+
+/* Do not let a touch hold leave a native button focus state behind. The
+   click still fires normally; this only removes browser focus styling. */
+songList?.addEventListener("pointerdown", event => {
+  if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
+  const button = event.target.closest(".song-row button");
+  if (!button) return;
+  button.blur();
+  requestAnimationFrame(() => button.blur());
+}, { passive: true, capture: true });
+
+let mobileSongMeasureFrame = 0;
+
+function updateMobileSongWrapState(row) {
+  if (!row) return;
+  if (!mobileSongLayoutQuery.matches) {
+    row.classList.remove("is-title-multiline");
+    return;
+  }
+
+  const titleText = row.querySelector(".song-title-text");
+  if (!titleText) return;
+
+  const style = getComputedStyle(titleText);
+  const lineHeight = parseFloat(style.lineHeight) || 19.55;
+  const height = titleText.getBoundingClientRect().height;
+  row.classList.toggle("is-title-multiline", height > lineHeight * 1.45);
+}
+
+function syncMobileSongWrapStates() {
+  document.querySelectorAll(".song-row").forEach(updateMobileSongWrapState);
+}
+
+function queueMobileSongWrapSync() {
+  cancelAnimationFrame(mobileSongMeasureFrame);
+  mobileSongMeasureFrame = requestAnimationFrame(() => {
+    mobileSongMeasureFrame = requestAnimationFrame(syncMobileSongWrapStates);
+  });
+}
+
+window.addEventListener("resize", queueMobileSongWrapSync, { passive: true });
+if (document.fonts?.ready) {
+  document.fonts.ready.then(queueMobileSongWrapSync).catch(() => {});
+}
+
 function getVisibleSongs() {
   return songs.filter(song => {
     const matchesFilter =
@@ -2450,9 +2534,25 @@ function renderSongs() {
   visible.forEach(song => {
     const fragment = template.content.cloneNode(true);
     const row = fragment.querySelector(".song-row");
-    const titleButton = fragment.querySelector(".song-title");
+    let titleButton = fragment.querySelector(".song-title");
     const playButton = fragment.querySelector(".play-song");
     const mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
+
+    // On touch/mobile, avoid native <button> pressed/focus rendering entirely.
+    // Some mobile browsers synthesize :hover/:active while a finger is held or
+    // dragged, which can visually resize/reposition button text even when the
+    // declared font-size is unchanged. A neutral role=button element keeps the
+    // same tap-to-play behavior without the browser-native press treatment.
+    if (mobileSongLayoutQuery.matches && titleButton?.tagName === "BUTTON") {
+      const mobileTitle = document.createElement("div");
+      mobileTitle.className = titleButton.className;
+      mobileTitle.setAttribute("role", "button");
+      mobileTitle.setAttribute("tabindex", "0");
+      mobileTitle.setAttribute("aria-label", "Play song");
+      while (titleButton.firstChild) mobileTitle.appendChild(titleButton.firstChild);
+      titleButton.replaceWith(mobileTitle);
+      titleButton = mobileTitle;
+    }
 
     row.dataset.id = song.id;
 
@@ -2470,7 +2570,31 @@ function renderSongs() {
     }
 
     titleButton.addEventListener("click", event => {
-      event.currentTarget.blur();
+      event.currentTarget.blur?.();
+      playSong(song);
+    });
+
+    if (titleButton.getAttribute("role") === "button") {
+      titleButton.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        titleButton.blur?.();
+        playSong(song);
+      });
+    }
+
+    // Desktop: treat the entire song card as the playback hit area, including
+    // metadata and the expanded note. Existing playback buttons keep their own
+    // handlers, and destructive/detail controls are excluded.
+    row.addEventListener("click", event => {
+      const isDesktopPointer = window.matchMedia(
+        "(min-width: 851px) and (hover: hover) and (pointer: fine)"
+      ).matches;
+
+      if (!isDesktopPointer) return;
+      if (event.target.closest(".delete-song, .mobile-details-toggle")) return;
+      if (event.target.closest(".song-title, .play-song")) return;
+
       playSong(song);
     });
     setScriptAwareText(fragment.querySelector(".song-artist"), song.artist);
@@ -2498,6 +2622,7 @@ function renderSongs() {
       mobileDetailsToggle.setAttribute("aria-expanded", String(willOpen));
       mobileDetailsToggle.textContent = willOpen ? "NOTE −" : "NOTE +";
       event.currentTarget.blur();
+      queueMobileSongWrapSync();
     });
 
     const canYouTube = Boolean(getYouTubeVideoId(song.youtubeUrl));
@@ -2550,6 +2675,7 @@ function renderSongs() {
     songList.appendChild(fragment);
   });
 
+  queueMobileSongWrapSync();
   syncPlayButtons();
   renderStats();
   syncStatsPlayingState();

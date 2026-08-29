@@ -18,7 +18,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="assets/css/styles.css?v=101" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=116" />
 </head>
 
 <body class="access-checking">
@@ -166,6 +166,7 @@
                 <button class="pixel-swatch" type="button" data-color="#FF8A3D" aria-label="Orange" aria-pressed="false"
                   style="--swatch:#FF8A3D"></button>
               </div>
+
 
               <label class="pixel-custom-color" aria-label="Custom color">
                 <span>+</span>
@@ -356,11 +357,12 @@
     <template id="songRowTemplate">
       <article class="song-row">
         <div class="row-main">
-          <span class="song-number"></span><button class="song-title" type="button"><span
+          <span class="song-number-rail"><span class="song-number"></span><span aria-hidden="true" class="mobile-playing-indicator"><span
+                class="archive-eq-bars"><i></i><i></i><i></i></span></span></span><button class="song-title" type="button"><span
               class="song-title-text"></span><span aria-hidden="true" class="archive-playing-indicator"><span
                 class="archive-eq-bars"><i></i><i></i><i></i></span><span
-                class="archive-playing-label">PLAYING</span></span></button><span class="song-artist"></span><span
-            class="song-from"></span><span class="song-date"></span><button aria-expanded="false"
+                class="archive-playing-label">PLAYING</span></span></button><span class="song-artist"></span><span class="song-meta"><span
+            class="song-from"></span><span class="song-date"></span></span><button aria-expanded="false"
             class="mobile-details-toggle" type="button">NOTE +</button>
         </div>
         <div class="row-expanded">
@@ -377,8 +379,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/app.js?v=98"></script>
-  <script src="assets/js/mobile-title-gap.js?v=109"></script>
+  <script src="assets/js/app.js?v=116"></script>
+  <script src="assets/js/mobile-title-gap.js?v=110"></script>
 
 </body>
 
