@@ -1212,7 +1212,12 @@ function removeNewMarkerFromSongDom(songId) {
   const id = String(songId);
   document.querySelectorAll(".song-row").forEach(row => {
     if (String(row.dataset.id || "") !== id) return;
-    row.classList.remove("is-new");
+    // Keep the NEW-slot layout class for this rendered row after it is read.
+    // Removing it immediately used to switch .song-title-text from flex to block
+    // on the same tap that started playback, which could cause a tiny mobile
+    // reflow. The marker is hidden, but its layout footprint stays stable until
+    // the next normal render.
+    row.classList.add("is-new-read");
     row.querySelectorAll(".latest-song-marker").forEach(marker => {
       marker.classList.add("is-read-placeholder");
       marker.setAttribute("aria-hidden", "true");
@@ -2275,6 +2280,7 @@ function playSong(song, requestedSource = null) {
   currentSongId = song.id;
   syncPlayButtons();
   syncStatsPlayingState();
+  stabilizeMobileArchiveHorizontalPosition();
 }
 
 function renderSourceTabs(song, activeSource) {
@@ -2437,6 +2443,27 @@ const mobileSongLayoutQuery = window.matchMedia(
   "(max-width: 768px), (hover: none) and (pointer: coarse)"
 );
 
+
+function stabilizeMobileArchiveHorizontalPosition() {
+  if (!mobileSongLayoutQuery.matches) return;
+
+  const y = window.scrollY;
+  const reset = () => {
+    const root = document.scrollingElement;
+    if (root && root.scrollLeft !== 0) root.scrollLeft = 0;
+    if (window.scrollX !== 0) window.scrollTo(0, y);
+    if (songList && songList.scrollLeft !== 0) songList.scrollLeft = 0;
+  };
+
+  reset();
+  requestAnimationFrame(() => {
+    reset();
+    requestAnimationFrame(reset);
+  });
+  setTimeout(reset, 80);
+  setTimeout(reset, 240);
+}
+
 // Mobile browsers can synthesize hover/focus and show a text-selection
 // magnifier/callout during a long press. Keep those browser-native effects
 // from changing the perceived title size while preserving normal tap/scroll.
@@ -2451,7 +2478,11 @@ const mobileSongLayoutQuery = window.matchMedia(
 ["pointerup", "pointercancel"].forEach(type => {
   songList?.addEventListener(type, event => {
     if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
-    event.target.closest(".song-row")?.querySelector(".song-title")?.blur();
+    const row = event.target.closest(".song-row");
+    row?.querySelector(".song-title")?.blur?.();
+
+    // Horizontal movement is never part of the archive interaction.
+    stabilizeMobileArchiveHorizontalPosition();
   }, { passive: true });
 });
 
@@ -2459,10 +2490,10 @@ const mobileSongLayoutQuery = window.matchMedia(
    click still fires normally; this only removes browser focus styling. */
 songList?.addEventListener("pointerdown", event => {
   if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
-  const button = event.target.closest(".song-row button");
-  if (!button) return;
-  button.blur();
-  requestAnimationFrame(() => button.blur());
+  const control = event.target.closest('.song-row button, .song-row [role="button"]');
+  if (!control) return;
+  control.blur?.();
+  requestAnimationFrame(() => control.blur?.());
 }, { passive: true, capture: true });
 
 let mobileSongMeasureFrame = 0;
@@ -2471,16 +2502,33 @@ function updateMobileSongWrapState(row) {
   if (!row) return;
   if (!mobileSongLayoutQuery.matches) {
     row.classList.remove("is-title-multiline");
+    row.style.removeProperty("--mobile-first-line-width");
     return;
   }
 
   const titleText = row.querySelector(".song-title-text");
-  if (!titleText) return;
+  const titleSpan = titleText?.querySelector(":scope > span:first-child");
+  if (!titleText || !titleSpan) return;
+
+  // A DOM Range returns one client rect per rendered text line. This is more
+  // reliable than comparing total element height and also gives us the exact
+  // first-line width needed to place the NEW marker immediately after the
+  // visible text instead of after the full wrapping frame.
+  const range = document.createRange();
+  range.selectNodeContents(titleSpan);
+  const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
+
+  if (rects.length) {
+    row.classList.toggle("is-title-multiline", rects.length > 1);
+    row.style.setProperty("--mobile-first-line-width", `${rects[0].width.toFixed(2)}px`);
+    return;
+  }
 
   const style = getComputedStyle(titleText);
   const lineHeight = parseFloat(style.lineHeight) || 19.55;
   const height = titleText.getBoundingClientRect().height;
   row.classList.toggle("is-title-multiline", height > lineHeight * 1.45);
+  row.style.setProperty("--mobile-first-line-width", `${titleSpan.getBoundingClientRect().width.toFixed(2)}px`);
 }
 
 function syncMobileSongWrapStates() {
@@ -2538,6 +2586,13 @@ function renderSongs() {
     const playButton = fragment.querySelector(".play-song");
     const mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
 
+    if (mobileSongLayoutQuery.matches) {
+      // Touch controls remain clickable but do not enter the browser's focus
+      // navigation path, preventing focus-driven viewport nudges on mobile.
+      if (playButton) playButton.tabIndex = -1;
+      if (mobileDetailsToggle) mobileDetailsToggle.tabIndex = -1;
+    }
+
     // On touch/mobile, avoid native <button> pressed/focus rendering entirely.
     // Some mobile browsers synthesize :hover/:active while a finger is held or
     // dragged, which can visually resize/reposition button text even when the
@@ -2547,7 +2602,11 @@ function renderSongs() {
       const mobileTitle = document.createElement("div");
       mobileTitle.className = titleButton.className;
       mobileTitle.setAttribute("role", "button");
-      mobileTitle.setAttribute("tabindex", "0");
+      // Keep it clickable but out of the mobile focus navigation path.
+      // Some mobile browsers horizontally nudge the viewport to reveal a
+      // focusable element during a tap/drag, which made the song block appear
+      // to shift a few pixels.
+      mobileTitle.setAttribute("tabindex", "-1");
       mobileTitle.setAttribute("aria-label", "Play song");
       while (titleButton.firstChild) mobileTitle.appendChild(titleButton.firstChild);
       titleButton.replaceWith(mobileTitle);
@@ -2574,7 +2633,7 @@ function renderSongs() {
       playSong(song);
     });
 
-    if (titleButton.getAttribute("role") === "button") {
+    if (titleButton.getAttribute("role") === "button" && titleButton.tabIndex >= 0) {
       titleButton.addEventListener("keydown", event => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
@@ -2623,6 +2682,7 @@ function renderSongs() {
       mobileDetailsToggle.textContent = willOpen ? "NOTE −" : "NOTE +";
       event.currentTarget.blur();
       queueMobileSongWrapSync();
+      stabilizeMobileArchiveHorizontalPosition();
     });
 
     const canYouTube = Boolean(getYouTubeVideoId(song.youtubeUrl));
@@ -2643,6 +2703,7 @@ function renderSongs() {
     const deleteButton = fragment.querySelector(".delete-song");
     const canDelete = song.senderPerson === currentPerson;
 
+    if (mobileSongLayoutQuery.matches && deleteButton) deleteButton.tabIndex = -1;
     deleteButton.hidden = !canDelete;
 
     deleteButton.addEventListener("click", async () => {

@@ -11518,3 +11518,322 @@
     cursor: none !important;
   }
 }
+
+/* V57 — mobile horizontal stability.
+   Touch browsers may briefly focus/reveal a tapped control, and intrinsic
+   widths from the playing/note action row can otherwise influence the song
+   card's inline size. Lock the archive row to the viewport's existing content
+   width and keep every interaction state on the same horizontal origin. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .archive,
+  .song-list,
+  .song-list .song-row,
+  .song-list .song-row .row-main,
+  .song-list .song-row .row-expanded {
+    box-sizing: border-box !important;
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    translate: none !important;
+  }
+
+  .song-list {
+    overflow-x: clip !important;
+    overscroll-behavior-x: none !important;
+  }
+
+  .song-list .song-row,
+  .song-list .song-row:hover,
+  .song-list .song-row:focus-within,
+  .song-list .song-row:active,
+  .song-list .song-row.is-playing,
+  .song-list .song-row.mobile-expanded {
+    position: relative !important;
+    left: 0 !important;
+    right: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    contain: none !important;
+  }
+
+  /* Keep title/artist/note on exactly the same x-origin in every state. */
+  .song-list .song-row .song-title,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:focus-within .song-title,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.mobile-expanded .song-title,
+  .song-list .song-row .song-artist,
+  .song-list .song-row:hover .song-artist,
+  .song-list .song-row:focus-within .song-artist,
+  .song-list .song-row:active .song-artist,
+  .song-list .song-row.is-playing .song-artist,
+  .song-list .song-row.mobile-expanded .song-artist,
+  .song-list .song-row .expanded-copy,
+  .song-list .song-row .expanded-note,
+  .song-list .song-row.mobile-expanded .expanded-copy,
+  .song-list .song-row.mobile-expanded .expanded-note {
+    left: auto !important;
+    right: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    translate: none !important;
+  }
+
+  /* A read NEW marker remains a layout placeholder until the next render, so
+     starting playback never changes the title's flex/block formatting model. */
+  .song-list .song-row.is-new-read .latest-song-marker.is-read-placeholder {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Touch-only controls must not cause focus-scroll nudges. They remain fully
+     clickable; this simply removes browser focus geometry from touch use. */
+  .song-list .song-row .song-title,
+  .song-list .song-row .mobile-details-toggle,
+  .song-list .song-row .play-song,
+  .song-list .song-row .delete-song {
+    scroll-margin-inline: 0 !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+}
+
+/* V58 — mobile expanded note/action strip: equal vertical breathing room.
+   Preserve the existing total 20px vertical padding while balancing it evenly. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-list .song-row.mobile-expanded .row-expanded,
+  .song-list .song-row.mobile-expanded:hover .row-expanded,
+  .song-list .song-row.mobile-expanded:focus-within .row-expanded,
+  .song-list .song-row.mobile-expanded:active .row-expanded {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+
+/* V60 — precise mobile first-line alignment.
+   The title's first rendered line width is measured in JS and exposed through
+   --mobile-first-line-width. NEW is absolutely positioned immediately after
+   that first line, so wrapped titles no longer push the badge to the far edge.
+   The song number is centered for one-line titles and bottom-aligned to the
+   first line when the title wraps. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-list .song-row .song-number-rail,
+  .song-list .song-row:hover .song-number-rail,
+  .song-list .song-row:focus-within .song-number-rail,
+  .song-list .song-row:active .song-number-rail,
+  .song-list .song-row.is-playing .song-number-rail,
+  .song-list .song-row.mobile-expanded .song-number-rail {
+    transform: translateY(4.8px) !important;
+  }
+
+  .song-list .song-row.is-title-multiline .song-number-rail,
+  .song-list .song-row.is-title-multiline:hover .song-number-rail,
+  .song-list .song-row.is-title-multiline:focus-within .song-number-rail,
+  .song-list .song-row.is-title-multiline:active .song-number-rail,
+  .song-list .song-row.is-title-multiline.is-playing .song-number-rail,
+  .song-list .song-row.is-title-multiline.mobile-expanded .song-number-rail {
+    /* 19.55px title line-height - ~10px number line box = 9.55px. */
+    transform: translateY(9.5px) !important;
+  }
+
+  .song-list .song-row.is-new .song-title,
+  .song-list .song-row.is-new:hover .song-title,
+  .song-list .song-row.is-new:focus-within .song-title,
+  .song-list .song-row.is-new:active .song-title,
+  .song-list .song-row.is-new.is-playing .song-title,
+  .song-list .song-row.is-new.mobile-expanded .song-title {
+    position: relative !important;
+  }
+
+  .song-list .song-row.is-new .song-title-text,
+  .song-list .song-row.is-new:hover .song-title-text,
+  .song-list .song-row.is-new:focus-within .song-title-text,
+  .song-list .song-row.is-new:active .song-title-text,
+  .song-list .song-row.is-new.is-playing .song-title-text,
+  .song-list .song-row.is-new.mobile-expanded .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:hover .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:focus-within .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new:active .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new.is-playing .song-title-text,
+  .song-list .song-row.is-title-multiline.is-new.mobile-expanded .song-title-text {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .song-list .song-row.is-new .song-title-text > span:first-child,
+  .song-list .song-row.is-new:hover .song-title-text > span:first-child,
+  .song-list .song-row.is-new:focus-within .song-title-text > span:first-child,
+  .song-list .song-row.is-new:active .song-title-text > span:first-child,
+  .song-list .song-row.is-new.is-playing .song-title-text > span:first-child,
+  .song-list .song-row.is-new.mobile-expanded .song-title-text > span:first-child {
+    display: block !important;
+    width: auto !important;
+    max-width: calc(100% - 24px) !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .song-list .song-row.is-new .latest-song-marker,
+  .song-list .song-row.is-new:hover .latest-song-marker,
+  .song-list .song-row.is-new:focus-within .latest-song-marker,
+  .song-list .song-row.is-new:active .latest-song-marker,
+  .song-list .song-row.is-new.is-playing .latest-song-marker,
+  .song-list .song-row.is-new.mobile-expanded .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:hover .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:focus-within .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new:active .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new.is-playing .latest-song-marker,
+  .song-list .song-row.is-title-multiline.is-new.mobile-expanded .latest-song-marker {
+    position: absolute !important;
+    left: min(calc(var(--mobile-first-line-width, 0px) + 4px), calc(100% - 20px)) !important;
+    top: 6px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-self: auto !important;
+    transform: none !important;
+    z-index: 1 !important;
+  }
+}
+
+
+/* V61 — optical correction for wrapped mobile song numbers.
+   V60 placed the number's visible bottom ~5px below the first title line.
+   Keep one-line positioning untouched; wrapped titles use the corrected offset. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .song-list .song-row.is-title-multiline .song-number-rail,
+  .song-list .song-row.is-title-multiline:hover .song-number-rail,
+  .song-list .song-row.is-title-multiline:focus-within .song-number-rail,
+  .song-list .song-row.is-title-multiline:active .song-number-rail,
+  .song-list .song-row.is-title-multiline.is-playing .song-number-rail,
+  .song-list .song-row.is-title-multiline.mobile-expanded .song-number-rail {
+    transform: translateY(4.5px) !important;
+  }
+}
+
+
+/* V62 — hard mobile horizontal-coordinate lock.
+   The remaining intermittent shift came from viewport/scroll-gutter changes
+   when the fixed player opens plus touch-browser horizontal rubber-band.
+   Keep the document width stable and allow only vertical touch panning inside
+   the archive. No song interaction state is allowed to alter the x-origin. */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  html {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: clip !important;
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable !important;
+    overscroll-behavior-x: none !important;
+  }
+
+  body,
+  body.access-granted,
+  body.player-open,
+  #appShell,
+  #archiveView,
+  .archive,
+  #songList,
+  .song-list {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip !important;
+    overscroll-behavior-x: none !important;
+  }
+
+  #archiveView,
+  .archive,
+  #songList,
+  .song-list,
+  .song-list .song-row,
+  .song-list .song-row .row-main,
+  .song-list .song-row .row-expanded {
+    touch-action: pan-y !important;
+  }
+
+  .song-list .song-row,
+  .song-list .song-row:hover,
+  .song-list .song-row:focus-within,
+  .song-list .song-row:active,
+  .song-list .song-row.is-playing,
+  .song-list .song-row.mobile-expanded {
+    inset-inline-start: 0 !important;
+    margin-inline: 0 !important;
+    translate: 0 0 !important;
+    transform: none !important;
+    contain: none !important;
+  }
+
+  /* One authoritative left guide for the visible copy column. */
+  .song-list .song-row {
+    --mobile-copy-inset: calc(2.25rem + 9px);
+  }
+
+  .song-list .song-row .row-main,
+  .song-list .song-row:hover .row-main,
+  .song-list .song-row:focus-within .row-main,
+  .song-list .song-row:active .row-main,
+  .song-list .song-row.is-playing .row-main,
+  .song-list .song-row.mobile-expanded .row-main {
+    margin-inline: 0 !important;
+    inset-inline-start: 0 !important;
+    translate: 0 0 !important;
+    transform: none !important;
+  }
+
+  .song-list .song-row .song-title,
+  .song-list .song-row .song-artist,
+  .song-list .song-row .expanded-copy,
+  .song-list .song-row .expanded-note,
+  .song-list .song-row:hover .song-title,
+  .song-list .song-row:hover .song-artist,
+  .song-list .song-row:active .song-title,
+  .song-list .song-row:active .song-artist,
+  .song-list .song-row.is-playing .song-title,
+  .song-list .song-row.is-playing .song-artist,
+  .song-list .song-row.mobile-expanded .song-title,
+  .song-list .song-row.mobile-expanded .song-artist,
+  .song-list .song-row.mobile-expanded .expanded-copy,
+  .song-list .song-row.mobile-expanded .expanded-note {
+    margin-inline-start: 0 !important;
+    padding-inline-start: 0 !important;
+    inset-inline-start: auto !important;
+    translate: 0 0 !important;
+    transform: none !important;
+  }
+
+  .song-list .song-row .row-expanded,
+  .song-list .song-row:hover .row-expanded,
+  .song-list .song-row:focus-within .row-expanded,
+  .song-list .song-row:active .row-expanded,
+  .song-list .song-row.mobile-expanded .row-expanded {
+    padding-inline-start: var(--mobile-copy-inset) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .song-list .song-row {
+    --mobile-copy-inset: calc(2rem + 9px);
+  }
+}
