@@ -137,6 +137,7 @@ const songList = document.querySelector("#songList");
 const songCount = document.querySelector("#songCount");
 const emptyState = document.querySelector("#emptyState");
 const searchInput = document.querySelector("#searchInput");
+const searchWrap = searchInput ? searchInput.closest(".search-wrap") : null;
 const filters = document.querySelector("#filters");
 const dialog = document.querySelector("#songDialog");
 const form = document.querySelector("#songForm");
@@ -180,6 +181,10 @@ const addSongNav = document.querySelector("#addSongNav");
 
 const archiveView = document.querySelector("#archiveView");
 const statsView = document.querySelector("#statsView");
+const wallView = document.querySelector("#wallView");
+const coverWall = document.querySelector("#coverWall");
+const wallEmpty = document.querySelector("#wallEmpty");
+const wallAlbumCount = document.querySelector("#wallAlbumCount");
 const archiveTools = document.querySelector("#archiveTools");
 const viewButtons = [...document.querySelectorAll(".view-button")];
 
@@ -1322,15 +1327,63 @@ function mapRemoteSong(row) {
     senderPerson,
     createdBy: row.created_by || null,
     recommendedBy: senderPerson === currentPerson ? "me" : "friend",
-    createdAt: row.created_at || new Date().toISOString()
+    createdAt: row.created_at || new Date().toISOString(),
+    albumName: String(row.album_name || ""),
+    albumArtist: String(row.album_artist || ""),
+    albumArtworkUrl: String(row.album_artwork_url || ""),
+    albumSource: String(row.album_source || ""),
+    albumKey: String(row.album_key || ""),
+    releaseType: String(row.release_type || "album"),
+    spotifyAlbumId: String(row.spotify_album_id || ""),
+    bandcampUrl: String(row.bandcamp_url || ""),
+    albumExternalUrl: String(row.album_external_url || ""),
+    albumMatchConfidence: row.album_match_confidence ?? null,
+    albumResolutionStatus: String(row.album_resolution_status || ""),
+    albumLocked: Boolean(row.album_locked),
+    albumResolvedAt: row.album_resolved_at || null
   };
 }
 
-async function loadRemoteSongs({ quiet = false } = {}) {
+let remoteSongsHaveLoaded = false;
+
+function songDatasetSignature(list = songs) {
+  return JSON.stringify((list || []).map(song => [
+    String(song.id || ""),
+    String(song.title || ""),
+    String(song.artist || ""),
+    String(song.youtubeUrl || ""),
+    String(song.spotifyUrl || ""),
+    String(song.note || ""),
+    String(song.senderPerson || ""),
+    String(song.createdAt || ""),
+    String(song.albumName || ""),
+    String(song.albumArtist || ""),
+    String(song.albumArtworkUrl || ""),
+    String(song.albumSource || ""),
+    String(song.albumKey || ""),
+    String(song.releaseType || ""),
+    String(song.spotifyAlbumId || ""),
+    String(song.bandcampUrl || ""),
+    String(song.albumExternalUrl || ""),
+    String(song.albumMatchConfidence ?? ""),
+    String(song.albumResolutionStatus || ""),
+    String(song.albumLocked || ""),
+    String(song.albumResolvedAt || "")
+  ]));
+}
+
+function songReadStateSignature() {
+  return Array.from(readSongIdsForCurrentPerson || [])
+    .map(String)
+    .sort()
+    .join("|");
+}
+
+async function loadRemoteSongs({ quiet = false, forceRender = false } = {}) {
   const { data, error } = await supabaseClient
     .from("songs")
     .select(
-      "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at"
+      "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
     )
     .order("created_at", { ascending: false });
 
@@ -1342,13 +1395,23 @@ async function loadRemoteSongs({ quiet = false } = {}) {
     throw error;
   }
 
-  songs = (data || [])
+  const nextSongs = (data || [])
     .map(mapRemoteSong)
     .sort((a, b) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-  renderSongs();
+  const changed = songDatasetSignature(nextSongs) !== songDatasetSignature(songs);
+  songs = nextSongs;
+
+  if (!remoteSongsHaveLoaded || changed || forceRender) {
+    remoteSongsHaveLoaded = true;
+    renderSongs();
+  } else {
+    remoteSongsHaveLoaded = true;
+  }
+
+  return changed;
 }
 
 function stopRealtime() {
@@ -1519,8 +1582,17 @@ document.addEventListener("visibilitychange", () => {
 
   if (!currentPerson) return;
 
+  // Returning to the tab used to rebuild the entire archive every time. When
+  // WALL was active that also cleared/recreated every album image, producing
+  // a visible flash even when Supabase data had not changed. Compare the read
+  // state + song dataset first and only render when something is genuinely new.
+  const previousReadState = songReadStateSignature();
+
   loadSongReadState()
-    .then(() => loadRemoteSongs({ quiet: true }))
+    .then(() => {
+      const readStateChanged = songReadStateSignature() !== previousReadState;
+      return loadRemoteSongs({ quiet: true, forceRender: readStateChanged });
+    })
     .catch(console.error);
 });
 
@@ -1965,24 +2037,914 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
 
 syncPlaybackPreferenceUi();
 
+const WALL_ARTWORK_STORAGE = "listening-archive-prototype-albums-v5";
+let wallArtworkCache = {};
+let wallRenderToken = 0;
+let wallRenderedSongSignature = "";
+
+try {
+  wallArtworkCache = JSON.parse(localStorage.getItem(WALL_ARTWORK_STORAGE) || "{}") || {};
+} catch { wallArtworkCache = {}; }
+
+
+let albumMetadataFunctionUnavailable = false;
+let albumMetadataBackfillPromise = null;
+
+function hasStoredAlbumMetadata(song) {
+  return Boolean(
+    song &&
+    String(song.albumName || "").trim() &&
+    String(song.albumArtworkUrl || "").trim() &&
+    String(song.albumKey || "").trim()
+  );
+}
+
+function needsKnownAlbumCorrection(song) {
+  if (!song) return false;
+  const title = normalizeArtworkText(song.title || "");
+  const artist = normalizeArtworkText(song.artist || "");
+  const album = normalizeArtworkText(song.albumName || "");
+
+  if (artist === "mogwai" && title === "i know you are but what am i") {
+    return album !== "happy songs for happy people";
+  }
+
+  if (title === "muffled beneath the sound of the ocean") {
+    return album !== "death of a rabbit";
+  }
+
+  return false;
+}
+
+function applyStoredAlbumMetadata(song, metadata) {
+  if (!song || !metadata) return song;
+  song.albumName = String(metadata.album_name ?? metadata.albumName ?? song.albumName ?? "");
+  song.albumArtist = String(metadata.album_artist ?? metadata.albumArtist ?? song.albumArtist ?? "");
+  song.albumArtworkUrl = String(metadata.album_artwork_url ?? metadata.albumArtworkUrl ?? song.albumArtworkUrl ?? "");
+  song.albumSource = String(metadata.album_source ?? metadata.albumSource ?? song.albumSource ?? "");
+  song.albumKey = String(metadata.album_key ?? metadata.albumKey ?? song.albumKey ?? "");
+  song.releaseType = String(metadata.release_type ?? metadata.releaseType ?? song.releaseType ?? "album");
+  song.spotifyAlbumId = String(metadata.spotify_album_id ?? metadata.spotifyAlbumId ?? song.spotifyAlbumId ?? "");
+  song.bandcampUrl = String(metadata.bandcamp_url ?? metadata.bandcampUrl ?? song.bandcampUrl ?? "");
+  song.albumExternalUrl = String(metadata.album_external_url ?? metadata.albumExternalUrl ?? song.albumExternalUrl ?? "");
+  song.albumMatchConfidence = metadata.album_match_confidence ?? metadata.albumMatchConfidence ?? song.albumMatchConfidence ?? null;
+  song.albumResolutionStatus = String(metadata.album_resolution_status ?? metadata.albumResolutionStatus ?? song.albumResolutionStatus ?? "");
+  song.albumLocked = Boolean(metadata.album_locked ?? metadata.albumLocked ?? song.albumLocked ?? false);
+  song.albumResolvedAt = metadata.album_resolved_at ?? metadata.albumResolvedAt ?? song.albumResolvedAt ?? null;
+  return song;
+}
+
+function storedAlbumForWall(song) {
+  const source = String(song.albumSource || "SUPABASE");
+  const storedUrl = String(song.albumArtworkUrl || "");
+  return {
+    url: source.toLowerCase() === "youtube" ? normalizeYouTubeArtworkUrl(storedUrl) : storedUrl,
+    source,
+    albumKey: String(song.albumKey || `song:${String(song.id)}`),
+    albumName: String(song.albumName || song.title || ""),
+    artistName: String(song.albumArtist || song.artist || ""),
+    releaseType: String(song.releaseType || "album"),
+    spotifyAlbumId: String(song.spotifyAlbumId || ""),
+    externalUrl: String(song.albumExternalUrl || "")
+  };
+}
+
+async function resolveAlbumMetadataViaSupabase(songList, { force = false, limit = 8 } = {}) {
+  const candidates = (songList || [])
+    .filter(song => song && !song.albumLocked && (force || !hasStoredAlbumMetadata(song) || needsKnownAlbumCorrection(song)))
+    .slice(0, Math.max(1, limit));
+
+  if (!candidates.length || albumMetadataFunctionUnavailable) return false;
+
+  let resolvedAny = false;
+
+  // The deployed resolver accepts one song_id per invocation. Run a few in
+  // parallel so existing libraries backfill gradually without hammering the
+  // Edge Function or Apple/Bandcamp endpoints.
+  const concurrency = 3;
+  for (let start = 0; start < candidates.length; start += concurrency) {
+    const batch = candidates.slice(start, start + concurrency);
+    const results = await Promise.all(batch.map(async song => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke(
+          "resolve-song-album",
+          { body: { song_id: String(song.id) } }
+        );
+
+        if (error) {
+          if (error?.context?.status === 404) albumMetadataFunctionUnavailable = true;
+          throw error;
+        }
+
+        const updated = data?.song || null;
+        const metadata = updated || data?.metadata || null;
+        if (metadata) {
+          applyStoredAlbumMetadata(song, metadata);
+          resolvedAny = Boolean(data?.resolved ?? true) || resolvedAny;
+        }
+        return true;
+      } catch (error) {
+        console.warn(`Album metadata resolve failed for song ${song.id}:`, error);
+        return false;
+      }
+    }));
+
+    if (albumMetadataFunctionUnavailable) break;
+    if (results.some(Boolean)) resolvedAny = true;
+  }
+
+  return resolvedAny;
+}
+
+function pendingAlbumForWall(song) {
+  return {
+    url: youtubeArtwork(song) || artworkPlaceholder(song),
+    source: "PENDING",
+    albumKey: `song:${String(song.id)}`,
+    albumName: String(song.title || ""),
+    artistName: String(song.artist || ""),
+    releaseType: "single",
+    spotifyAlbumId: "",
+    externalUrl: ""
+  };
+}
+
+function ensureWallAlbumMetadata(songList) {
+  const missing = (songList || []).filter(song => !hasStoredAlbumMetadata(song) || needsKnownAlbumCorrection(song));
+  if (!missing.length || albumMetadataFunctionUnavailable) return;
+
+  // WALL must never wait for remote album lookup. Resolve missing/corrected rows
+  // quietly in the background. Do not rebuild the active wall when metadata
+  // finishes, because a grouping-key change would make neighboring album blocks
+  // jump. The corrected metadata appears the next time WALL is opened.
+  if (!albumMetadataBackfillPromise) {
+    albumMetadataBackfillPromise = resolveAlbumMetadataViaSupabase(missing)
+      .finally(() => { albumMetadataBackfillPromise = null; });
+  }
+}
+
+function normalizeArtworkText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function artworkPlaceholder(song) {
+  const title = String(song.title || "SONG").trim();
+  const artist = String(song.artist || "UNKNOWN").trim();
+  const initials = `${title.charAt(0) || "S"}${artist.charAt(0) || "A"}`.toUpperCase();
+  const safeTitle = title.replace(/[&<>"']/g, "");
+  const safeArtist = artist.replace(/[&<>"']/g, "");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="700" viewBox="0 0 700 700"><rect width="700" height="700" fill="#5f7cff"/><rect x="24" y="24" width="652" height="652" fill="none" stroke="#E7FE00" stroke-width="2"/><text x="48" y="116" fill="#E7FE00" font-family="Arial,sans-serif" font-size="22" font-weight="700">THE LISTENING ARCHIVE</text><text x="48" y="378" fill="#E7FE00" font-family="Georgia,serif" font-size="190" font-style="italic">${initials}</text><text x="48" y="566" fill="#E7FE00" font-family="Arial,sans-serif" font-size="28" font-weight="700">${safeTitle.slice(0,32)}</text><text x="48" y="610" fill="#E7FE00" opacity=".78" font-family="Arial,sans-serif" font-size="22">${safeArtist.slice(0,36)}</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function youtubeArtwork(song) {
+  const id = getYouTubeVideoId(song.youtubeUrl);
+  // mqdefault is a native 16:9 YouTube thumbnail. Unlike hqdefault (4:3), it
+  // avoids the common baked-in black letterbox bars when object-fit crops the
+  // artwork into the square WALL cell.
+  return id ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg` : "";
+}
+
+function normalizeYouTubeArtworkUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  return value
+    .replace(/\/hqdefault\.jpg(?:\?.*)?$/i, "/mqdefault.jpg")
+    .replace(/\/sddefault\.jpg(?:\?.*)?$/i, "/mqdefault.jpg");
+}
+
+async function fetchWithPrototypeTimeout(url, options = {}, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function spotifyArtwork(song) {
+  if (!song.spotifyUrl) return "";
+  try {
+    const response = await fetchWithPrototypeTimeout(`https://open.spotify.com/oembed?url=${encodeURIComponent(song.spotifyUrl)}`);
+    if (!response.ok) return "";
+    const data = await response.json();
+    return String(data?.thumbnail_url || "");
+  } catch { return ""; }
+}
+
+const MOGWAI_HAPPY_SONGS_BANDCAMP_URL = "https://mogwai.bandcamp.com/album/happy-songs-for-happy-people";
+const MOGWAI_HAPPY_SONGS_SPOTIFY_URL = "https://open.spotify.com/album/1k2uLH7mwB72zbepvM8rR4";
+
+async function bandcampArtworkFromPage(pageUrl) {
+  if (!pageUrl) return "";
+  const encoded = encodeURIComponent(pageUrl);
+  const endpoints = [
+    `https://bandcamp.com/api/oembed?url=${encoded}&format=json`,
+    `https://bandcamp.com/oembed?format=json&url=${encoded}`
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetchWithPrototypeTimeout(endpoint, {}, 5000);
+      if (!response.ok) continue;
+      const data = await response.json();
+      const artwork = String(
+        data?.thumbnail_url ||
+        data?.thumbnailUrl ||
+        data?.image?.url ||
+        data?.image ||
+        ""
+      ).trim();
+      if (artwork) return artwork;
+    } catch { }
+  }
+
+  // Stable fallback for the same album if Bandcamp blocks cross-origin oEmbed
+  // in a particular browser session. This keeps the wall from reverting to the
+  // older incorrect Mogwai cover.
+  try {
+    const response = await fetchWithPrototypeTimeout(
+      `https://open.spotify.com/oembed?url=${encodeURIComponent(MOGWAI_HAPPY_SONGS_SPOTIFY_URL)}`,
+      {},
+      4500
+    );
+    if (response.ok) {
+      const data = await response.json();
+      return String(data?.thumbnail_url || "").trim();
+    }
+  } catch { }
+
+  return "";
+}
+
+async function appleAlbumMatch(song) {
+  const term = `${song.title || ""} ${song.artist || ""}`.trim();
+  if (!term) return null;
+  try {
+    const url = `https://itunes.apple.com/search?media=music&entity=song&limit=10&term=${encodeURIComponent(term)}`;
+    const response = await fetchWithPrototypeTimeout(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const targetTitle = normalizeArtworkText(song.title);
+    const targetArtist = normalizeArtworkText(song.artist);
+    const results = Array.isArray(data?.results) ? data.results : [];
+    let best = null;
+    let bestScore = -1;
+
+    for (const result of results) {
+      const resultTitle = normalizeArtworkText(result.trackName);
+      const resultArtist = normalizeArtworkText(result.artistName);
+      let score = 0;
+      if (resultTitle === targetTitle) score += 6;
+      else if (resultTitle.includes(targetTitle) || targetTitle.includes(resultTitle)) score += 3;
+      if (resultArtist === targetArtist) score += 5;
+      else if (resultArtist.includes(targetArtist) || targetArtist.includes(resultArtist)) score += 2;
+      if (score > bestScore && result.artworkUrl100) {
+        best = result;
+        bestScore = score;
+      }
+    }
+
+    if (!best || bestScore < 4) return null;
+    const rawAlbumName = String(best.collectionName || "").trim();
+    const isSingle = /(?:\s[-–—]\s|\s)single$/i.test(rawAlbumName);
+    const cleanAlbumName = rawAlbumName
+      .replace(/\s+(?:[-–—]\s*)?EP$/i, "")
+      .replace(/\s+(?:[-–—]\s*)?Single$/i, "")
+      .trim();
+
+    return {
+      artworkUrl: String(best.artworkUrl100 || "").replace(/100x100bb(?:-\d+)?\./, "700x700bb."),
+      albumName: isSingle ? String(song.title || cleanAlbumName || rawAlbumName).trim() : cleanAlbumName,
+      albumId: best.collectionId ? String(best.collectionId) : "",
+      artistName: String(best.artistName || song.artist || "").trim(),
+      releaseType: isSingle ? "single" : "album"
+    };
+  } catch { return null; }
+}
+
+function stableArtworkIdentity(url) {
+  return String(url || "")
+    .replace(/\?.*$/, "")
+    .replace(/\/\d+x\d+[^/]*\.(jpg|jpeg|png|webp)$/i, "/ART.$1")
+    .toLowerCase();
+}
+
+function getPrototypeAlbumOverride(song) {
+  const title = normalizeArtworkText(song?.title || "");
+  const artist = normalizeArtworkText(song?.artist || "");
+  const suppliedAlbumName = normalizeArtworkText(String(song?.albumName || ""));
+
+  // Wall-art overrides for known metadata mismatches.
+  if (title === normalizeArtworkText("Muffled Beneath the Sound of the Ocean")) {
+    return {
+      url: "https://f4.bcbits.com/img/a3889476287_16.jpg",
+      source: "OVERRIDE",
+      albumKey: "override:death-of-a-rabbit",
+      albumName: "Death of a Rabbit",
+      artistName: String(song?.artist || artist || "").trim(),
+      releaseType: "album"
+    };
+  }
+
+  // Resolve the known Mogwai metadata mismatch from its canonical album source.
+  if (suppliedAlbumName === normalizeArtworkText("Mogwai") ||
+      suppliedAlbumName === normalizeArtworkText("Happy Songs for Happy People") ||
+      title === normalizeArtworkText("Mogwai")) {
+    return {
+      url: "",
+      bandcampPageUrl: MOGWAI_HAPPY_SONGS_BANDCAMP_URL,
+      source: "BANDCAMP",
+      albumKey: "override:mogwai-happy-songs-for-happy-people",
+      albumName: "Happy Songs for Happy People",
+      artistName: String(song?.artist || artist || "Mogwai").trim(),
+      releaseType: "album"
+    };
+  }
+
+  return null;
+}
+
+async function resolvePrototypeAlbum(song) {
+  const cacheKey = String(song.id);
+  const override = getPrototypeAlbumOverride(song);
+  if (override) {
+    if (override.bandcampPageUrl) {
+      override.url = await bandcampArtworkFromPage(override.bandcampPageUrl) || override.url;
+    }
+    if (!override.url) {
+      override.url = youtubeArtwork(song) || artworkPlaceholder(song);
+    }
+    wallArtworkCache[cacheKey] = override;
+    try { localStorage.setItem(WALL_ARTWORK_STORAGE, JSON.stringify(wallArtworkCache)); } catch { }
+    return override;
+  }
+  const cached = wallArtworkCache[cacheKey];
+  if (cached?.url && cached?.albumKey && String(cached?.albumName || "").trim()) return cached;
+
+  const [spotifyUrl, apple] = await Promise.all([
+    spotifyArtwork(song),
+    appleAlbumMatch(song)
+  ]);
+
+  let url = spotifyUrl || apple?.artworkUrl || youtubeArtwork(song) || artworkPlaceholder(song);
+  let source = spotifyUrl ? "SPOTIFY" : apple?.artworkUrl ? "APPLE MUSIC" : youtubeArtwork(song) ? "YOUTUBE" : "ARCHIVE";
+
+  let albumKey = "";
+  if (apple?.releaseType === "single") {
+    // Singles are represented by the recommended song itself rather than a
+    // release container, which also prevents unrelated single releases from
+    // being grouped together by a shared metadata quirk.
+    albumKey = `single:${String(song.id)}`;
+  } else if (apple?.albumId) {
+    albumKey = `apple:${apple.albumId}`;
+  } else if (spotifyUrl) {
+    albumKey = `art:${stableArtworkIdentity(spotifyUrl)}`;
+  } else {
+    // If album identity cannot be established safely, keep the recommendation
+    // separate rather than accidentally combining unrelated songs.
+    albumKey = `song:${String(song.id)}`;
+  }
+
+  let result = {
+    url,
+    source,
+    albumKey,
+    albumName: apple?.albumName || "",
+    artistName: apple?.artistName || String(song.artist || ""),
+    releaseType: apple?.releaseType || "album"
+  };
+
+  // Album-level override pass after external metadata resolution.
+  const normalizedAlbumName = normalizeArtworkText(result?.albumName || "");
+  if (normalizedAlbumName === normalizeArtworkText("Mogwai") ||
+      normalizedAlbumName === normalizeArtworkText("Happy Songs for Happy People")) {
+    const bandcampArtwork = await bandcampArtworkFromPage(MOGWAI_HAPPY_SONGS_BANDCAMP_URL);
+    result = {
+      ...result,
+      url: bandcampArtwork || result.url,
+      source: bandcampArtwork ? "BANDCAMP" : result.source,
+      albumKey: "override:mogwai-happy-songs-for-happy-people",
+      albumName: "Happy Songs for Happy People",
+      artistName: "Mogwai"
+    };
+  } else if (normalizedAlbumName === normalizeArtworkText("Death of a Rabbit")) {
+    result = {
+      ...result,
+      url: "https://f4.bcbits.com/img/a3889476287_16.jpg",
+      source: "OVERRIDE",
+      albumKey: "override:death-of-a-rabbit",
+      albumName: "Death of a Rabbit"
+    };
+  }
+
+  wallArtworkCache[cacheKey] = result;
+  try { localStorage.setItem(WALL_ARTWORK_STORAGE, JSON.stringify(wallArtworkCache)); } catch { }
+  return result;
+}
+
+function senderDisplayName(song) {
+  return song.senderPerson === "owner" ? ownerName() : friendName();
+}
+
+function makeAlbumGroups(resolvedSongs) {
+  const groups = new Map();
+
+  resolvedSongs.forEach(({ song, album }) => {
+    const key = album.albumKey || `song:${String(song.id)}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        albumName: album.albumName,
+        artistName: album.artistName || song.artist,
+        artwork: album.url,
+        source: album.source,
+        releaseType: album.releaseType || "album",
+        songs: []
+      });
+    }
+    const group = groups.get(key);
+    group.songs.push(song);
+    if (!group.albumName && album.albumName) group.albumName = album.albumName;
+  });
+
+  // getVisibleSongs() is newest-first, so Map insertion order naturally keeps
+  // albums ordered by their most recent recommendation.
+  return Array.from(groups.values());
+}
+
+
+const WALL_HALFTONE_PURPLE = "#5168E0";
+const WALL_HALFTONE_YELLOW = "#FFFF2E";
+const wallHalftonePromiseCache = new Map();
+
+function wallHalftoneProxyUrl(src) {
+  const raw = String(src || "").trim();
+  if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+  try {
+    const parsed = new URL(raw, window.location.href);
+    if (parsed.origin === window.location.origin) return parsed.href;
+    return `https://images.weserv.nl/?url=${encodeURIComponent(parsed.href)}&w=420&h=420&fit=cover&output=jpg&q=92`;
+  } catch {
+    return raw;
+  }
+}
+
+function loadHalftoneSource(src, useProxy = false) {
+  return new Promise((resolve, reject) => {
+    const source = new Image();
+    source.decoding = "async";
+    source.crossOrigin = "anonymous";
+    source.onload = () => resolve(source);
+    source.onerror = () => reject(new Error("halftone source failed"));
+    source.src = useProxy ? wallHalftoneProxyUrl(src) : src;
+  });
+}
+
+async function getHalftoneSource(src) {
+  try {
+    return await loadHalftoneSource(src, false);
+  } catch {
+    return loadHalftoneSource(src, true);
+  }
+}
+
+function renderTrueWallHalftone(source, canvas) {
+  const outputSize = 420;
+  const step = 5;
+  const cols = Math.ceil(outputSize / step);
+  const rows = Math.ceil(outputSize / step);
+
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return false;
+
+  // Downsample to one luminance sample per dot cell. Smaller cells + a larger
+  // output canvas preserve more detail while still reading as halftone.
+  const sample = document.createElement("canvas");
+  sample.width = cols;
+  sample.height = rows;
+  const sctx = sample.getContext("2d", { willReadFrequently: true });
+  if (!sctx) return false;
+
+  sctx.fillStyle = "#fff";
+  sctx.fillRect(0, 0, cols, rows);
+  sctx.drawImage(source, 0, 0, cols, rows);
+
+  let pixels;
+  try {
+    pixels = sctx.getImageData(0, 0, cols, rows).data;
+  } catch {
+    return false;
+  }
+
+  ctx.fillStyle = WALL_HALFTONE_PURPLE;
+  ctx.fillRect(0, 0, outputSize, outputSize);
+  ctx.fillStyle = WALL_HALFTONE_YELLOW;
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const i = (row * cols + col) * 4;
+      const alpha = pixels[i + 3] / 255;
+      const luminance = ((pixels[i] * 0.2126) + (pixels[i + 1] * 0.7152) + (pixels[i + 2] * 0.0722)) / 255;
+
+      // Balanced tone mapping: preserve midtone detail, deepen shadows slightly,
+      // and keep highlights clearer. This gives more perceived contrast without
+      // crushing detail the way a hard threshold would.
+      let tone = Math.max(0, Math.min(1, luminance * alpha));
+      tone = Math.max(0, Math.min(1, (tone - 0.045) / 0.91));
+      tone = Math.pow(tone, 0.95);
+
+      // Smaller dots overall so the image keeps more detail, while still letting
+      // bright areas grow close to the cell size.
+      const radius = 0.12 + tone * 2.02;
+      if (radius <= 0.16) continue;
+
+      const x = col * step + step * 0.5;
+      const y = row * step + step * 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  return true;
+}
+
+function ensureTrueWallHalftone(img, canvas) {
+  if (canvas.dataset.ready === "true") return Promise.resolve(true);
+  const src = String(img.currentSrc || img.src || "");
+  if (!src) return Promise.resolve(false);
+
+  const existing = wallHalftonePromiseCache.get(src);
+  if (existing) {
+    return existing.then(result => {
+      if (result && result.source && renderTrueWallHalftone(result.source, canvas)) {
+        canvas.dataset.ready = "true";
+        return true;
+      }
+      return false;
+    });
+  }
+
+  const promise = getHalftoneSource(src)
+    .then(source => ({ source }))
+    .catch(() => null);
+  wallHalftonePromiseCache.set(src, promise);
+
+  return promise.then(result => {
+    if (!result?.source) return false;
+    const rendered = renderTrueWallHalftone(result.source, canvas);
+    if (rendered) canvas.dataset.ready = "true";
+    return rendered;
+  });
+}
+
+function makeAlbumArtCell(group) {
+  const fallbackSong = group.songs[0];
+  const art = document.createElement("button");
+  art.type = "button";
+  art.className = "album-editorial-cell album-editorial-art";
+  art.setAttribute("aria-label", `Play ${fallbackSong.title} from ${group.albumName || "this album"}`);
+
+  const img = document.createElement("img");
+  img.alt = `${group.albumName || fallbackSong.title} — ${group.artistName || fallbackSong.artist}`;
+  img.loading = "lazy";
+  img.decoding = "async";
+  const isYouTubeArtwork = String(group.source || "").toLowerCase() === "youtube";
+  if (isYouTubeArtwork) art.classList.add("is-youtube-artwork");
+  const initialArtwork = isYouTubeArtwork
+    ? normalizeYouTubeArtworkUrl(group.artwork)
+    : group.artwork;
+  img.src = initialArtwork || youtubeArtwork(fallbackSong) || artworkPlaceholder(fallbackSong);
+  img.onerror = () => {
+    const youtubeFallback = youtubeArtwork(fallbackSong);
+    if (youtubeFallback && img.src !== youtubeFallback) {
+      art.classList.add("is-youtube-artwork");
+      img.src = youtubeFallback;
+      return;
+    }
+    img.onerror = null;
+    img.src = artworkPlaceholder(fallbackSong);
+  };
+
+  art.append(img);
+  art.addEventListener("click", () => playSong(fallbackSong));
+  return art;
+}
+
+function makeAlbumInfoCell(group) {
+  const fallbackSong = group.songs[0];
+  const info = document.createElement("article");
+  info.className = "album-editorial-cell album-editorial-info";
+  if (group.songs.length > 1) info.classList.add("has-multiple");
+
+  const albumName = document.createElement("h3");
+  albumName.className = "album-editorial-name";
+  const cleanedAlbumName = String(group.albumName || "")
+    .replace(/\s+(?:[-–—]\s*)?EP$/i, "")
+    .trim();
+  const displayAlbumName = group.releaseType === "single"
+    ? fallbackSong.title
+    : (cleanedAlbumName || fallbackSong.title);
+  setScriptAwareText(albumName, displayAlbumName);
+
+  const artist = document.createElement("p");
+  artist.className = "album-editorial-artist";
+  setScriptAwareText(artist, group.artistName || fallbackSong.artist);
+
+  const tracks = document.createElement("div");
+  tracks.className = "album-editorial-tracks";
+
+  // Wall captions intentionally contain only album name, the recommended
+  // song name(s), and artist name. Show every recommended track from this
+  // album so no requester/date/count metadata is needed.
+  group.songs.forEach(song => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "album-editorial-track";
+    button.setAttribute("aria-label", `Play ${song.title} by ${song.artist}`);
+    setScriptAwareText(button, song.title);
+    button.addEventListener("click", () => playSong(song));
+    tracks.appendChild(button);
+  });
+
+  info.append(albumName, artist, tracks);
+  return info;
+}
+
+function makeWallSpacer(type = "blank") {
+  const spacer = document.createElement("div");
+  spacer.className = `album-editorial-cell album-editorial-spacer is-${type}`;
+  spacer.setAttribute("aria-hidden", "true");
+  return spacer;
+}
+
+function wallLayoutHash(value) {
+  const text = String(value || "wall");
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function appendAlbumCollage(groups) {
+  // Build a broad set of paired editorial row patterns. Each album remains a
+  // two-cell cover + caption pair, but every grid column can host cover art,
+  // copy, yellow, or breathing space. This prevents one cover column from
+  // becoming visually dominant across a long wall.
+  const dominoSlots = [[0, 1], [2, 3], [4, 5]];
+  const templates = [];
+
+  for (let emptySlot = 0; emptySlot < dominoSlots.length; emptySlot += 1) {
+    const occupiedSlots = [0, 1, 2].filter(index => index !== emptySlot);
+    for (const swapAlbums of [false, true]) {
+      for (const flipA of [false, true]) {
+        for (const flipB of [false, true]) {
+          for (const flipDecor of [false, true]) {
+            const pattern = Array(6).fill("blank");
+            const slotA = dominoSlots[occupiedSlots[swapAlbums ? 1 : 0]];
+            const slotB = dominoSlots[occupiedSlots[swapAlbums ? 0 : 1]];
+            const decorSlot = dominoSlots[emptySlot];
+
+            pattern[slotA[0]] = flipA ? "a" : "A";
+            pattern[slotA[1]] = flipA ? "A" : "a";
+            pattern[slotB[0]] = flipB ? "b" : "B";
+            pattern[slotB[1]] = flipB ? "B" : "b";
+            pattern[decorSlot[0]] = flipDecor ? "blank" : "solid";
+            pattern[decorSlot[1]] = flipDecor ? "solid" : "blank";
+            templates.push(pattern);
+          }
+        }
+      }
+    }
+  }
+
+  let albumIndex = 0;
+  let rowIndex = 0;
+  let previousCoverColumns = [];
+  let previousBlankColumns = [];
+  let previousSolidColumn = -1;
+
+  const totalRows = Math.ceil(groups.length / 2);
+  const maxYellowCells = Math.min(totalRows, 12); // 6 columns × max 2 each.
+  const yellowRows = new Set();
+  if (maxYellowCells === 1) {
+    yellowRows.add(0);
+  } else if (maxYellowCells > 1) {
+    for (let i = 0; i < maxYellowCells; i += 1) {
+      yellowRows.add(Math.round(i * (totalRows - 1) / (maxYellowCells - 1)));
+    }
+  }
+
+  const solidColumnCounts = Array(6).fill(0);
+  const blankColumnCounts = Array(6).fill(0);
+  const coverColumnCounts = Array(6).fill(0);
+
+  const coverColumnsFor = pattern => pattern
+    .map((token, i) => (token === "A" || token === "B") ? i : -1)
+    .filter(i => i >= 0);
+  const decorativeBlankColumnsFor = pattern => pattern
+    .map((token, i) => token === "blank" ? i : -1)
+    .filter(i => i >= 0);
+  const solidColumnFor = pattern => pattern.indexOf("solid");
+
+  while (albumIndex < groups.length) {
+    const rowGroups = groups.slice(albumIndex, albumIndex + 2);
+    const seedText = rowGroups.map(group => group.key).join("|") + `:${rowIndex}`;
+    const startingIndex = wallLayoutHash(seedText) % templates.length;
+    const useYellowThisRow = yellowRows.has(rowIndex);
+    const minSolidCount = Math.min(...solidColumnCounts);
+
+    let bestTemplateIndex = startingIndex;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let offset = 0; offset < templates.length; offset += 1) {
+      const templateIndex = (startingIndex + offset) % templates.length;
+      const template = templates[templateIndex];
+      const solidColumn = solidColumnFor(template);
+      const coverColumns = coverColumnsFor(template);
+      const blankColumns = decorativeBlankColumnsFor(template);
+
+      if (useYellowThisRow && solidColumnCounts[solidColumn] >= 2) continue;
+
+      const nextCoverCounts = coverColumnCounts.slice();
+      coverColumns.forEach(col => { nextCoverCounts[col] += 1; });
+      const nextMaxCover = Math.max(...nextCoverCounts);
+      const nextMinCover = Math.min(...nextCoverCounts);
+      const coverVariance = nextCoverCounts.reduce((sum, count) => {
+        const mean = nextCoverCounts.reduce((a, b) => a + b, 0) / 6;
+        return sum + ((count - mean) ** 2);
+      }, 0);
+
+      const repeatedCoverCount = coverColumns.filter(col => previousCoverColumns.includes(col)).length;
+      const repeatedBlankCount = blankColumns.filter(col => previousBlankColumns.includes(col)).length;
+      let score = 0;
+
+      // Highest priority: cover art should stay evenly distributed. A template
+      // that makes the busiest cover column even busier is heavily penalized.
+      score += (nextMaxCover - nextMinCover) * 2500;
+      score += coverVariance * 220;
+      score += repeatedCoverCount * 420;
+      if (coverColumns.join(",") === previousCoverColumns.join(",")) score += 1800;
+
+      // Spread decorative breathing space too, avoiding a visibly empty column.
+      score += blankColumns.reduce((sum, col) => sum + blankColumnCounts[col], 0) * 80;
+      score += repeatedBlankCount * 110;
+      if (blankColumns.join(",") === previousBlankColumns.join(",")) score += 550;
+
+      if (useYellowThisRow) {
+        // Every column should receive its first yellow before any column gets a
+        // second whenever the available rows permit it.
+        score += (solidColumnCounts[solidColumn] - minSolidCount) * 5000;
+        if (previousSolidColumn === solidColumn) score += 900;
+      }
+
+      score += offset * 0.001; // deterministic tie break
+      if (score < bestScore) {
+        bestScore = score;
+        bestTemplateIndex = templateIndex;
+      }
+    }
+
+    const templateIndex = bestTemplateIndex;
+    const template = templates[templateIndex];
+    const chosenSolidColumn = solidColumnFor(template);
+    const chosenCoverColumns = coverColumnsFor(template);
+    const chosenBlankColumns = decorativeBlankColumnsFor(template);
+    const canUseSolid = useYellowThisRow && solidColumnCounts[chosenSolidColumn] < 2;
+
+    if (canUseSolid) solidColumnCounts[chosenSolidColumn] += 1;
+    chosenCoverColumns.forEach(col => { coverColumnCounts[col] += 1; });
+    chosenBlankColumns.forEach(col => {
+      // On non-yellow rows the nominal solid cell becomes a second blank, so
+      // account for it as breathing space when balancing future rows.
+      blankColumnCounts[col] += 1;
+    });
+    if (!canUseSolid && chosenSolidColumn >= 0) blankColumnCounts[chosenSolidColumn] += 1;
+
+    previousCoverColumns = chosenCoverColumns;
+    previousBlankColumns = chosenBlankColumns;
+    previousSolidColumn = canUseSolid ? chosenSolidColumn : -1;
+
+    const row = document.createElement("div");
+    row.className = `album-editorial-row pattern-${templateIndex}`;
+
+    const albumA = rowGroups[0] || null;
+    const albumB = rowGroups[1] || null;
+    const cells = {
+      A: albumA ? makeAlbumArtCell(albumA) : makeWallSpacer("blank"),
+      a: albumA ? makeAlbumInfoCell(albumA) : makeWallSpacer("blank"),
+      B: albumB ? makeAlbumArtCell(albumB) : makeWallSpacer("blank"),
+      b: albumB ? makeAlbumInfoCell(albumB) : makeWallSpacer("blank")
+    };
+
+    template.forEach((token, columnIndex) => {
+      if (token === "solid") {
+        row.appendChild(makeWallSpacer(canUseSolid && columnIndex === chosenSolidColumn ? "solid" : "blank"));
+      } else if (token === "blank") {
+        row.appendChild(makeWallSpacer("blank"));
+      } else {
+        row.appendChild(cells[token]);
+      }
+    });
+
+    coverWall.appendChild(row);
+    albumIndex += rowGroups.length;
+    rowIndex += 1;
+  }
+}
+
+function wallVisibleSongSignature(songList = getVisibleSongs()) {
+  return (songList || []).map(song => String(song.id)).join("|");
+}
+
+async function renderWall() {
+  if (!coverWall || !wallEmpty) return;
+  const token = ++wallRenderToken;
+  const visible = getVisibleSongs();
+  wallRenderedSongSignature = wallVisibleSongSignature(visible);
+
+  wallEmpty.hidden = true;
+
+  if (!visible.length) {
+    coverWall.innerHTML = "";
+    wallEmpty.hidden = false;
+    if (wallAlbumCount) wallAlbumCount.textContent = "0 ALBUMS";
+    return;
+  }
+
+  // Render immediately from Supabase metadata already present in the songs
+  // query. Missing rows get a lightweight placeholder and are resolved in the
+  // background, so opening WALL never waits on Bandcamp/Apple network calls.
+  const resolved = visible.map(song => ({
+    song,
+    album: hasStoredAlbumMetadata(song)
+      ? storedAlbumForWall(song)
+      : pendingAlbumForWall(song)
+  }));
+
+  if (token !== wallRenderToken) return;
+  const groups = makeAlbumGroups(resolved);
+  coverWall.innerHTML = "";
+  wallEmpty.hidden = groups.length > 0;
+  if (wallAlbumCount) wallAlbumCount.textContent = `${groups.length} ALBUM${groups.length === 1 ? "" : "S"}`;
+  appendAlbumCollage(groups);
+
+  // Fire-and-forget background backfill. This is intentionally after the DOM
+  // render so it cannot delay first paint.
+  ensureWallAlbumMetadata(visible);
+}
+
 function setView(view) {
   const isStats = view === "stats";
+  const isWall = view === "wall";
+  const isArchive = !isStats && !isWall;
   hideStatsTooltip();
 
-  archiveView.hidden = isStats;
+  archiveView.hidden = !isArchive;
   statsView.hidden = !isStats;
+  wallView.hidden = !isWall;
   archiveTools.hidden = isStats;
+
+  if (filters) {
+    filters.hidden = isWall;
+    filters.style.display = isWall ? "none" : "";
+  }
+  if (searchWrap) {
+    searchWrap.hidden = isWall;
+    searchWrap.style.display = isWall ? "none" : "";
+  }
 
   viewButtons.forEach(button => {
     button.classList.toggle("active", button.dataset.view === view);
   });
 
   document.body.classList.toggle("stats-mode", isStats);
+  document.body.classList.toggle("wall-mode", isWall);
 
   if (isStats) {
     renderStats();
     requestAnimationFrame(() => {
       statsView.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  } else if (isWall) {
+    // Opening WALL is the deliberate refresh boundary: use the latest Supabase
+    // metadata, then keep that arrangement stable for the duration of the view.
+    wallRenderedSongSignature = "";
+    renderWall();
+    requestAnimationFrame(() => {
+      wallView.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 }
@@ -2068,14 +3030,18 @@ form.addEventListener("submit", async event => {
         created_by: currentUser.id
       })
       .select(
-        "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at"
+        "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
       )
       .single();
 
     if (error) throw error;
 
     if (inserted) {
-      songs.unshift(mapRemoteSong(inserted));
+      const newSong = mapRemoteSong(inserted);
+      songs.unshift(newSong);
+      // Persist canonical album metadata on the songs row through the deployed
+      // Supabase resolver (Bandcamp when supplied, then Apple/iTunes fallback).
+      await resolveAlbumMetadataViaSupabase([newSong], { limit: 1 });
       renderSongs();
     } else {
       await loadRemoteSongs();
@@ -2584,7 +3550,7 @@ function renderSongs() {
     const row = fragment.querySelector(".song-row");
     let titleButton = fragment.querySelector(".song-title");
     const playButton = fragment.querySelector(".play-song");
-    const mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
+    let mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
 
     if (mobileSongLayoutQuery.matches) {
       // Touch controls remain clickable but do not enter the browser's focus
@@ -2611,6 +3577,24 @@ function renderSongs() {
       while (titleButton.firstChild) mobileTitle.appendChild(titleButton.firstChild);
       titleButton.replaceWith(mobileTitle);
       titleButton = mobileTitle;
+    }
+
+    // NOTE uses the same neutral touch-control strategy as the mobile title.
+    // A native button can still receive synthesized :active/:focus geometry on
+    // iOS/Android even with tabindex=-1, which was the last source of the row
+    // visibly nudging when NOTE was opened.
+    if (mobileSongLayoutQuery.matches && mobileDetailsToggle?.tagName === "BUTTON") {
+      const mobileNoteToggle = document.createElement("div");
+      mobileNoteToggle.className = mobileDetailsToggle.className;
+      mobileNoteToggle.setAttribute("role", "button");
+      mobileNoteToggle.setAttribute("tabindex", "-1");
+      mobileNoteToggle.setAttribute(
+        "aria-expanded",
+        mobileDetailsToggle.getAttribute("aria-expanded") || "false"
+      );
+      mobileNoteToggle.textContent = mobileDetailsToggle.textContent;
+      mobileDetailsToggle.replaceWith(mobileNoteToggle);
+      mobileDetailsToggle = mobileNoteToggle;
     }
 
     row.dataset.id = song.id;
@@ -2665,6 +3649,14 @@ function renderSongs() {
     mobileDetailsToggle.addEventListener("click", event => {
       event.stopPropagation();
 
+      // Preserve the exact visual anchor of the tapped row. Expanding a block
+      // near a viewport edge can otherwise trigger browser scroll anchoring and
+      // make the title/artist/note group appear to jump even though its CSS did
+      // not move.
+      const beforeTop = mobileSongLayoutQuery.matches
+        ? row.getBoundingClientRect().top
+        : null;
+
       const willOpen = !row.classList.contains("mobile-expanded");
 
       document.querySelectorAll(".song-row.mobile-expanded").forEach(openRow => {
@@ -2680,9 +3672,22 @@ function renderSongs() {
       row.classList.toggle("mobile-expanded", willOpen);
       mobileDetailsToggle.setAttribute("aria-expanded", String(willOpen));
       mobileDetailsToggle.textContent = willOpen ? "NOTE −" : "NOTE +";
-      event.currentTarget.blur();
-      queueMobileSongWrapSync();
-      stabilizeMobileArchiveHorizontalPosition();
+      event.currentTarget.blur?.();
+
+      // NOTE does not alter the title width, so do not re-measure title wrapping
+      // during this interaction. That removes a second possible geometry change.
+      if (beforeTop !== null) {
+        requestAnimationFrame(() => {
+          const afterTop = row.getBoundingClientRect().top;
+          const deltaY = afterTop - beforeTop;
+          if (Math.abs(deltaY) > 0.5) {
+            window.scrollBy(0, deltaY);
+          }
+          stabilizeMobileArchiveHorizontalPosition();
+        });
+      } else {
+        stabilizeMobileArchiveHorizontalPosition();
+      }
     });
 
     const canYouTube = Boolean(getYouTubeVideoId(song.youtubeUrl));
@@ -2740,6 +3745,12 @@ function renderSongs() {
   syncPlayButtons();
   renderStats();
   syncStatsPlayingState();
+  if (wallView && !wallView.hidden) {
+    const nextWallSongSignature = wallVisibleSongSignature(visible);
+    // Preserve the current wall positions while only metadata changes. Rebuild
+    // only when the actual visible song set changes (add/delete/filter/search).
+    if (nextWallSongSignature !== wallRenderedSongSignature) renderWall();
+  }
 
 }
 

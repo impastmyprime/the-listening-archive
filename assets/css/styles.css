@@ -3514,9 +3514,7 @@
           2.5rem minmax(0, 1fr) 4.5rem !important;
       }
 
-      /* Mobile/coarse-pointer title sizing is controlled by the canonical
-         mobile rules at the end of this file. Do not resize titles from a
-         synthetic touch :hover/:focus state here. */
+      
       .archive-playing-label {
         display: none;
       }
@@ -4024,8 +4022,7 @@
       .song-row:focus-within .row-main,
       .song-row:focus-within:not(:hover) .row-main {
         display: grid !important;
-        /* Let the sender-name column size to its content instead of
-           squeezing it into a fixed 3.25rem column. */
+        
         grid-template-columns: 2.25rem minmax(0, 1fr) max-content !important;
         grid-template-rows: auto auto auto !important;
 
@@ -4097,8 +4094,7 @@
         justify-self: end !important;
         align-self: start !important;
 
-        /* Keep sender labels fully visible on narrow screens.
-           Prevent truncation caused by fixed grid sizing. */
+        
         width: max-content !important;
         max-width: none !important;
         min-width: max-content !important;
@@ -7274,7 +7270,7 @@
       cursor: default !important;
     }
 
-    /* Keep the custom cursor active across the recommendation timeline area. */
+    
     .timeline-viz-section,
     .timeline-art,
     .timeline-viz-section *,
@@ -8315,19 +8311,19 @@
 }
 
 
-/* Optical size correction for Cyrillic fallback glyphs. */
+
 .script-size-adjust {
   font-size: 0.94em;
   line-height: inherit;
 }
 
-/* Dynamic stats headline optical tracking. */
+
 #statsHeadline {
   letter-spacing: -.045em !important;
 }
 
 
-/* Mobile recommendation timeline: individual chronological sequence. */
+
 .timeline-track-viewport {
   min-width: 0;
   height: 100%;
@@ -8456,9 +8452,7 @@
 }
 
 
-/* MOBILE SENDER FIX
-   Keep the sender label independent from the song-title layout.
-   Prevent temporary truncation while fonts/layout/data load. */
+
 @media (max-width: 760px) {
   .song-row .row-main {
     position: relative !important;
@@ -8493,15 +8487,13 @@
     transform: none !important;
   }
 
-  /* Reserve enough horizontal room for the sender without changing its
-     own width. */
+  
   .song-row .song-title {
     padding-right: 45px !important;
   }
 }
 
-/* Desktop recommendation timeline: match the mobile one-song-per-point sequence.
-   Desktop remains hover-only; the sequence can be horizontally inspected when needed. */
+
 @media (min-width: 769px) and (hover: hover) and (pointer: fine) {
   .timeline-art.timeline-art-mobile-sequence {
     grid-template-columns: var(--timeline-lane-width, 54px) minmax(0, 1fr) !important;
@@ -8585,9 +8577,7 @@
   }
 }
 
-/* Timeline popup/title consistency + clearer month labels.
-   Song titles inside timeline tooltips use a script-aware nested span; inherit
-   the strong title typography so they match recurring-artist popup titles. */
+
 .stats-tooltip strong > span {
   font-family: inherit !important;
   font-style: inherit !important;
@@ -8609,9 +8599,7 @@
   }
 }
 
-/* Smooth centered hover for recommendation timeline dots.
-   Keep every point anchored to its visual center and animate only transform,
-   so the circle grows without width/height reflow or edge-origin jumps. */
+
 @media (hover: hover) and (pointer: fine) {
   .timeline-art.timeline-art-mobile-sequence .timeline-dot,
   .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type,
@@ -8666,9 +8654,7 @@
   }
 }
 
-/* Playing recommendation point: keep the waveform legible.
-   This override intentionally comes after the hover-normalization rules,
-   which otherwise reduce the active dot back to the normal 8px size. */
+
 .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing,
 .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:first-of-type,
 .timeline-art.timeline-art-mobile-sequence .timeline-dot.is-playing:last-of-type {
@@ -8719,10 +8705,7 @@
 
 
 
-/* Mobile recommendation timeline selection.
-   A touch press itself has no visual effect. A completed tap selects one dot,
-   keeping the same centered scale as desktop hover until another dot or empty
-   space is tapped. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .timeline-art.timeline-art-mobile-sequence .timeline-dot,
   .timeline-art.timeline-art-mobile-sequence .timeline-dot:first-of-type,
@@ -8739,8 +8722,7 @@
       border-color 220ms ease !important;
   }
 
-  /* Neutralize browser touch :hover/:active/focus persistence. Holding a dot
-     must not enlarge it before a completed tap has selected it. */
+  
   .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):hover,
   .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):active,
   .timeline-art.timeline-art-mobile-sequence .timeline-dot:not(.is-selected):not(.is-playing):focus,
@@ -8792,7 +8774,7 @@
   }
 }
 
-/* Mobile view tabs: ARCHIVE and STATS must be optically identical in type size. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .view-switch .view-button,
   .view-switch .view-button.active,
@@ -8815,8 +8797,7 @@
   }
 }
 
-/* HOW BAD DID IT GET?: pull the monthly columns closer to the heading.
-   The chart has a tall internal bar canvas, so heading margin alone is not enough. */
+
 .monthly-viz-section .viz-heading {
   margin-bottom: 0 !important;
 }
@@ -8835,9 +8816,7 @@
   }
 }
 
-/* V16 — HOW BAD DID IT GET?: remove the actual internal desktop spacer.
-   A late desktop rule was adding 65px top padding + a 250px bar canvas,
-   which kept the bars visually far from the heading regardless of heading margin. */
+
 .monthly-viz-section .viz-heading {
   margin-bottom: 8px !important;
 }
@@ -8869,9 +8848,7 @@
   }
 }
 
-/* V17 access-page desktop title alignment:
-   keep the title's bottom aligned with the access field while bringing its
-   visual top down to the 01 / 02 baseline zone. */
+
 @media (min-width: 901px) {
   .access-title-form-row .access-title {
     transform: scaleY(.925) !important;
@@ -8881,10 +8858,7 @@
 
 
 
-/* V19 mobile archive row stability.
-   A playing song must not reflow its number/title/artist when selected.
-   Reserve the now-playing indicator slot for every row and neutralize
-   touch-browser hover/focus geometry changes. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-row,
   .song-row:hover,
@@ -8971,8 +8945,7 @@
     line-height: inherit !important;
   }
 
-  /* Keep this slot in the layout even when it is not visible. That makes
-     the title use exactly the same width before and after playback starts. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator {
@@ -9046,10 +9019,7 @@
 }
 
 
-/* V20 mobile archive composition.
-   Playback status lives in the track-number rail instead of consuming title
-   width. Sender and date behave as one stable metadata block, so a wrapped
-   title cannot push the date up/down or separate it from the row. */
+
 .song-meta {
   display: contents;
 }
@@ -9076,8 +9046,7 @@
     overflow-wrap: anywhere !important;
   }
 
-  /* A subtle now-playing equalizer sits directly under the track number.
-     Absolute positioning keeps it out of the title flow entirely. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
@@ -9134,7 +9103,7 @@
     border-radius: 1px !important;
   }
 
-  /* Right-side metadata remains one compact unit regardless of title height. */
+  
   .song-row .song-meta,
   .song-row:hover .song-meta,
   .song-row:focus-within .song-meta,
@@ -9200,10 +9169,7 @@
   }
 }
 
-/* V21 desktop archive hover alignment.
-   Keep all primary row fields on one true typographic baseline when the
-   song title enlarges, so the track number, title, artist, requester and date
-   read as a single horizontal line rather than vertically drifting. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .song-row .song-number {
     grid-column: 1 !important;
@@ -9293,10 +9259,7 @@
   }
 }
 
-/* V22 desktop archive: lock primary metadata to one immovable line.
-   Hover may change typography/color, but never the measured row geometry.
-   Bottom-aligning a fixed-height row keeps the title, artist, requester, date
-   and track number visually anchored even when the title font becomes larger. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .song-row .row-main,
   .song-row:hover .row-main,
@@ -9388,17 +9351,13 @@
     white-space: nowrap !important;
   }
 
-  /* The number now stays in the primary row, so suppress its duplicate in
-     the expanded detail strip on desktop. */
+  
   .song-row .expanded-number {
     visibility: hidden !important;
   }
 }
 
-/* V23 desktop archive stability reset.
-   Keep the primary row's measured typography/layout identical on hover so
-   content never clips or jumps. Hover emphasis comes from the row color/
-   background and expanded detail strip, not from resizing the main fields. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .song-row .row-main,
   .song-row:hover .row-main,
@@ -9511,8 +9470,7 @@
     letter-spacing: normal !important;
   }
 
-  /* Keep all five primary fields on the same first line even if a long title
-     or artist wraps below it. */
+  
   .song-row .song-number { grid-column: 1 !important; }
   .song-row .song-title { grid-column: 2 !important; }
   .song-row .song-artist { grid-column: 3 !important; }
@@ -9532,10 +9490,7 @@
   }
 }
 
-/* V24 desktop archive hover typography.
-   Restore the original Instrument Serif hover character without returning to
-   fixed-height/ellipsis clipping. Long song titles remain fully visible and
-   may wrap naturally; the row grows downward as needed. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .song-row:hover .song-title,
   .song-row:focus-within .song-title {
@@ -9565,8 +9520,7 @@
     line-height: inherit !important;
   }
 
-  /* Anchor the metadata to the first line while the serif title is allowed
-     to continue onto additional lines below it. */
+  
   .song-row:hover .song-number,
   .song-row:hover .song-artist,
   .song-row:hover .song-from,
@@ -9579,14 +9533,9 @@
   }
 }
 
-/* V25 desktop archive polish.
-   - Restore a stable now-playing waveform beside the title.
-   - Keep the default row vertically centered.
-   - Give the expanded note more breathing room below the title row.
-   The waveform slot is reserved for every desktop row so playback does not
-   change title width or cause a reflow when a song starts. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* Default / non-hovered rows should read as one centered line. */
+  
   .song-row:not(:hover):not(:focus-within) .row-main,
   .song-row.is-playing:not(:hover):not(:focus-within) .row-main {
     align-items: center !important;
@@ -9607,8 +9556,7 @@
     padding-bottom: 0 !important;
   }
 
-  /* The title remains fully visible and may wrap. Reserve a small waveform
-     slot so starting playback never shifts or clips the title. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -9674,8 +9622,7 @@
     height: 10px !important;
   }
 
-  /* Hovered titles keep the restored Instrument Serif styling. The waveform
-     follows the title on the same visual line without affecting wrapping. */
+  
   .song-row:hover .song-title,
   .song-row:focus-within .song-title {
     align-items: flex-start !important;
@@ -9686,7 +9633,7 @@
     margin-top: .18em !important;
   }
 
-  /* More separation between the enlarged title row and the note/detail strip. */
+  
   .song-row:hover .row-expanded,
   .song-row:focus-within .row-expanded,
   .song-row.is-playing:hover .row-expanded,
@@ -9695,13 +9642,9 @@
   }
 }
 
-/* V26 desktop archive playing-state polish.
-   Keep a persistent PLAYING + waveform marker after the pointer leaves,
-   restore the detail-strip number beside the note, and add breathing room
-   between the enlarged title row and the note content. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* Reserve the complete playing badge on every row so playback never
-     changes the title width. It is only painted for the active row. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
@@ -9755,8 +9698,7 @@
     flex: 0 0 14px !important;
   }
 
-  /* On the serif hover state, keep the playing badge attached to the first
-     title line. Off-hover it remains vertically centered with the default row. */
+  
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
   .song-row.is-playing:hover .archive-playing-indicator,
@@ -9768,8 +9710,7 @@
     margin-top: 0 !important;
   }
 
-  /* Restore the original number position in the expanded note strip. The
-     main-row number fades only while the detail strip is open. */
+  
   .song-row .expanded-number,
   .song-row:hover .expanded-number,
   .song-row:focus-within .expanded-number {
@@ -9794,8 +9735,7 @@
     align-items: start !important;
   }
 
-  /* More vertical separation between the title block and the note/detail
-     strip. A larger max-height prevents wrapped notes from being squeezed. */
+  
   .song-row:hover .row-expanded,
   .song-row:focus-within .row-expanded,
   .song-row.is-playing:hover .row-expanded,
@@ -9806,14 +9746,9 @@
   }
 }
 
-/* V27 desktop archive optical alignment.
-   Instrument Serif has taller vertical metrics than the sans-serif metadata,
-   so center the visible fields optically instead of aligning to a text edge.
-   Keep the persistent playing badge directly beside the song title. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* Both idle and hover states share a true vertical center. This prevents
-     artist / requester / date from appearing pinned to the top or bottom of
-     the larger Instrument Serif title. */
+  
   .song-row .row-main,
   .song-row:hover .row-main,
   .song-row:focus-within .row-main,
@@ -9838,8 +9773,7 @@
     align-self: center !important;
   }
 
-  /* Give the serif hover title more air above and below. The row is allowed
-     to grow naturally, so long names remain completely visible. */
+  
   .song-row:hover .row-main,
   .song-row:focus-within .row-main,
   .song-row.is-playing:hover .row-main,
@@ -9856,9 +9790,7 @@
     padding-bottom: .22em !important;
   }
 
-  /* Do not let the title span consume all free space before the playing
-     badge. The badge now follows the visible name rather than sitting at the
-     far edge of the title column. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -9885,8 +9817,7 @@
     max-width: calc(100% - 78px) !important;
   }
 
-  /* Hidden rows no longer reserve a 76px blank area. Only the actual playing
-     song paints the badge, keeping it visually attached to its name. */
+  
   .song-row:not(.is-playing) .archive-playing-indicator,
   .song-row:not(.is-playing):hover .archive-playing-indicator,
   .song-row:not(.is-playing):focus-within .archive-playing-indicator {
@@ -9908,8 +9839,7 @@
     justify-content: flex-start !important;
   }
 
-  /* On hover the serif title is optically centered, so the badge should not
-     be nudged upward by the older first-line alignment rule. */
+  
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
   .song-row.is-playing:hover .archive-playing-indicator,
@@ -9919,14 +9849,9 @@
   }
 }
 
-/* V28 desktop archive interaction polish.
-   1) Make the full title grid cell a reliable playback hit target.
-   2) Bottom-align the animated EQ bars with the PLAYING label.
-   Visual typography/layout from V27 remains unchanged. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* The song title is already a real <button> wired to playSong(). Stretch
-     that button across its entire grid cell so clicking anywhere in the
-     song-name column starts the song, not only the painted glyphs. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -9941,17 +9866,14 @@
     cursor: pointer !important;
   }
 
-  /* Keep the larger hit box visually neutral. The content stays where V27
-     placed it; the extra clickable height is transparent space around it. */
+  
   .song-row:not(:hover):not(:focus-within) .song-title,
   .song-row.is-playing:not(:hover):not(:focus-within) .song-title {
     padding-top: 7px !important;
     padding-bottom: 7px !important;
   }
 
-  /* Align the bottoms of the waveform and PLAYING text. The bars animate
-     upward from a shared bottom edge instead of floating around the label's
-     vertical centre. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
@@ -9978,11 +9900,9 @@
 }
 
 
-/* V29 desktop archive full-row playback + precise PLAYING/EQ alignment. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* The complete song card is a playback hit area: primary row, metadata,
-     expanded note and otherwise-empty card space. Buttons retain their own
-     interaction semantics through the JS exclusions. */
+  
   .song-row,
   .song-row .row-main,
   .song-row .row-expanded,
@@ -9997,9 +9917,7 @@
     cursor: pointer !important;
   }
 
-  /* Use a single 10px visual rail for both elements, then lift the bars by
-     one optical pixel. Inter's uppercase glyphs do not fill the line box all
-     the way to its mathematical bottom, so flex-end alone still looks low. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
@@ -10033,10 +9951,9 @@
   }
 }
 
-/* V30 final optical EQ adjustment + stable mobile multi-line song rows. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* One more optical pixel upward so the animated bars visually share the
-     same bottom edge as the PLAYING glyphs. */
+  
   .song-row .archive-eq-bars,
   .song-row.is-playing .archive-eq-bars {
     transform: translateY(-2px) !important;
@@ -10044,9 +9961,7 @@
 }
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-  /* Keep the title's measured typography identical in every interaction
-     state. A second line adds height naturally; tapping/playing/expanding
-     never changes its font metrics or vertical origin. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -10088,8 +10003,7 @@
     transform: none !important;
   }
 
-  /* The number belongs to the title row only, so a two-line title centers
-     the number against that title block instead of against title + artist. */
+  
   .song-row .song-number,
   .song-row:hover .song-number,
   .song-row:focus-within .song-number,
@@ -10107,8 +10021,7 @@
     transform: none !important;
   }
 
-  /* The note begins at the exact same x-position as the song title:
-     number-column width + the row's 9px column gap. */
+  
   .song-row .row-expanded,
   .song-row:hover .row-expanded,
   .song-row:focus-within .row-expanded,
@@ -10137,8 +10050,7 @@
   }
 }
 
-/* V32 mobile expanded-note spacing: change vertical breathing room only.
-   Keep the existing horizontal alignment/spacing untouched. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-row.mobile-expanded .row-expanded {
     max-height: 180px !important;
@@ -10155,16 +10067,13 @@
   }
 }
 
-/* V33 mobile playback indicator + NOTE hit target.
-   Keep the waveform out of the title button so multi-line song names cannot
-   compress or reposition it. NOTE +/- remains a text-sized target only. */
+
 .mobile-playing-indicator {
   display: none;
 }
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-  /* Desktop indicator stays inside the title for desktop only. On mobile use
-     a dedicated grid item in the number rail so title wrapping is irrelevant. */
+  
   .song-row .archive-playing-indicator,
   .song-row:hover .archive-playing-indicator,
   .song-row:focus-within .archive-playing-indicator,
@@ -10224,8 +10133,7 @@
     transform-origin: center bottom !important;
   }
 
-  /* NOTE +/- should only be clickable on the painted text, not across the
-     grid span around it. */
+  
   .song-row .mobile-details-toggle {
     display: inline-flex !important;
     width: max-content !important;
@@ -10242,9 +10150,7 @@
 }
 
 
-/* V34 canonical mobile archive row geometry.
-   This is the single final authority for mobile title metrics and number/wave
-   placement. It deliberately neutralizes legacy hover/focus/touch overrides. */
+
 .song-number-rail {
   display: contents;
 }
@@ -10271,8 +10177,7 @@
     align-items: start !important;
   }
 
-  /* Number and waveform are one rail. A wrapped title can grow independently
-     without moving the number or pushing the waveform farther down. */
+  
   .song-row .song-number-rail,
   .song-row:hover .song-number-rail,
   .song-row:focus-within .song-number-rail,
@@ -10316,8 +10221,7 @@
     transition: none !important;
   }
 
-  /* Mobile title metrics never change on hold, focus, tap, swipe, playback,
-     or note expansion. Long titles simply add another line at the same size. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -10384,8 +10288,7 @@
     transition: none !important;
   }
 
-  /* The dedicated mobile waves sit immediately below the number rail and
-     never participate in the title's grid row height. */
+  
   .song-row .mobile-playing-indicator,
   .song-row:hover .mobile-playing-indicator,
   .song-row:focus-within .mobile-playing-indicator,
@@ -10456,8 +10359,7 @@
   }
 }
 
-/* V36 mobile stability patch — preserve V34 layout exactly.
-   Only interaction typography and number alignment are adjusted. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-row,
   .song-row:hover,
@@ -10469,8 +10371,7 @@
     text-size-adjust: none !important;
   }
 
-  /* Touch browsers may synthesize hover/focus while holding or swiping.
-     Keep the title metrics identical in every possible mobile state. */
+  
   .song-row .song-title,
   .song-row:hover .song-title,
   .song-row:focus-within .song-title,
@@ -10523,9 +10424,7 @@
     transform: none !important;
   }
 
-  /* Preserve V34's number+wave rail. For one-line titles the rail is moved
-     only enough to optically center the number on that line. Wrapped titles
-     keep the rail at the top so the number aligns with the first line. */
+  
   .song-row .song-number-rail,
   .song-row:hover .song-number-rail,
   .song-row:focus-within .song-number-rail,
@@ -10545,9 +10444,7 @@
   }
 }
 
-/* V37 mobile expanded-song spacing.
-   Keep the V36 grid/typography intact; only bring the expanded note and
-   playback/delete actions slightly closer to the song title. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-row.mobile-expanded .row-expanded {
     padding-top: 8px !important;
@@ -10559,8 +10456,7 @@
   }
 }
 
-/* V38 mobile toolbar optical centering.
-   Keep layout/spacing intact; make all four visible controls share one vertical center. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .toolbar {
     align-items: center !important;
@@ -10593,7 +10489,7 @@
 }
 
 
-/* V39: shorter mobile bottom player while preserving all playback controls. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .player-bar {
     grid-template-columns: minmax(0, 1fr) 30px !important;
@@ -10655,7 +10551,7 @@
   }
 }
 
-/* V40: give the compact mobile player copy/source area a little more breathing room. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .player-bar {
     gap: 7px !important;
@@ -10675,10 +10571,7 @@
 }
 
 
-/* V41 mobile long-press typography hardening.
-   Prevent touch callouts/text selection from visually magnifying a title,
-   and use one font shorthand as the final authority for every interaction
-   state. No grid, spacing, note, number, or waveform geometry is changed. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-list,
   .song-list .song-row,
@@ -10738,11 +10631,9 @@
 }
 
 
-/* V43: final mobile song-title reset and exact desktop DATE edge. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-  /* Reset the button itself instead of fighting older :hover/:focus rules.
-     This makes touch-hold, swipe, click, playback and NOTE toggling use the
-     exact same measured typography. */
+  
   .song-list .song-row .song-title,
   .song-list .song-row:hover .song-title,
   .song-list .song-row:focus-within .song-title,
@@ -10851,8 +10742,7 @@
   }
 }
 
-/* DATE is taken out of grid alignment math and pinned to the exact same
-   right content edge used by the sticky toolbar / + ADD SONG button. */
+
 @media (min-width: 851px) {
   .archive .table-head {
     position: relative !important;
@@ -10870,11 +10760,7 @@
   }
 }
 
-/* V44 mobile archive interaction firewall.
-   Mobile browsers synthesize :hover/:focus/:active while a finger is held or
-   dragged. Older desktop archive rules alter row height, padding and metadata
-   metrics in those states. Lock the ENTIRE mobile row to one geometry so
-   press/hold/swipe/play/note interactions cannot resize or move its text. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   html,
   body,
@@ -10913,7 +10799,7 @@
     transform: none !important;
   }
 
-  /* This is the single authoritative mobile main-row geometry. */
+  
   .song-list .song-row .row-main,
   .song-list .song-row:hover .row-main,
   .song-list .song-row:focus-within .row-main,
@@ -10944,7 +10830,7 @@
     transition: none !important;
   }
 
-  /* Title geometry and type never change, including native/synthetic states. */
+  
   .song-list .song-row .song-title,
   .song-list .song-row:hover .song-title,
   .song-list .song-row:focus-within .song-title,
@@ -11028,8 +10914,7 @@
     transition: none !important;
   }
 
-  /* Lock all neighboring metadata too; older hover rules used different
-     line-heights/padding and made the row appear to jump around the title. */
+  
   .song-list .song-row .song-artist,
   .song-list .song-row:hover .song-artist,
   .song-list .song-row:focus-within .song-artist,
@@ -11126,7 +11011,7 @@
     -webkit-tap-highlight-color: transparent !important;
   }
 
-  /* Desktop playing badge never participates in the mobile title width. */
+  
   .song-list .song-row .archive-playing-indicator,
   .song-list .song-row:hover .archive-playing-indicator,
   .song-list .song-row:focus-within .archive-playing-indicator,
@@ -11139,8 +11024,7 @@
     padding: 0 !important;
   }
 
-  /* Only NOTE state may open the detail row; synthetic touch hover/focus may
-     never change its height or padding. */
+  
   .song-list .song-row .row-expanded,
   .song-list .song-row:hover .row-expanded,
   .song-list .song-row:focus-within .row-expanded,
@@ -11169,8 +11053,7 @@
     padding: 8px 0 12px calc(2.25rem + 9px) !important;
   }
 
-  /* Preserve the requested number behavior: centered for one-line titles,
-     first-line aligned for wrapped titles; waves remain directly below it. */
+  
   .song-list .song-row .song-number-rail,
   .song-list .song-row:hover .song-number-rail,
   .song-list .song-row:focus-within .song-number-rail,
@@ -11240,10 +11123,7 @@
 }
 
 
-/* V45: eliminate the remaining intermittent mobile song-row shift.
-   A NEW marker used to be removed on first play, which could re-wrap the
-   title at the exact moment playback began. Keep its layout box until the
-   next full render, but hide it visually after it is read. */
+
 .latest-song-marker.is-read-placeholder {
   visibility: hidden !important;
   opacity: 0 !important;
@@ -11252,7 +11132,7 @@
 
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-  /* Freeze the visible title line box during play/read transitions. */
+  
   .song-list .song-row .song-title,
   .song-list .song-row .song-title-text,
   .song-list .song-row .song-title-text > span:first-child,
@@ -11268,9 +11148,7 @@
   }
 }
 
-/* V46: compact mobile NEW badge beside the song title.
-   The title owns a flexible capped frame so wrapped names always leave room
-   for the badge. One-line titles center the badge; wrapped titles top-align it. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-list .song-row.is-new .song-title-text,
   .song-list .song-row.is-new:hover .song-title-text,
@@ -11356,10 +11234,9 @@
 
 
 
-/* V49 — desktop archive header alignment cleanup. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
-  /* Keep DATE inside the same five-column grid as every song row.
-     Both the DATE header and date values start at the exact same left edge. */
+  
   .archive .table-head {
     position: relative !important;
     display: grid !important;
@@ -11392,16 +11269,14 @@
     padding-right: 0 !important;
   }
 
-  /* ARTIST uses the same weight as the other desktop column titles. */
+  
   .archive .table-head > span:nth-child(3) {
     font-weight: 600 !important;
   }
 }
 
 
-/* V52 — canonical desktop archive grid.
-   One shared column definition for the table header and every song-row state
-   prevents DATE/header drift caused by older hover/responsive overrides. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .archive {
     --archive-desktop-columns:
@@ -11446,13 +11321,13 @@
     text-overflow: clip !important;
   }
 
-  /* Keep ARTIST consistent with the other archive column labels. */
+  
   .archive .table-head > span:nth-child(3) {
     font-weight: 600 !important;
   }
 }
 
-/* V53: vertically center playback-source labels in the compact mobile player. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .player-bar .source-tab {
     display: inline-flex !important;
@@ -11464,9 +11339,7 @@
 }
 
 
-/* V54: optical centering for the compact mobile playback-source label.
-   Uppercase glyphs look slightly high even when the button is flex-centered,
-   so nudge only the text—not the button box—down by 1px. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .player-bar .source-tab {
     min-height: 20px !important;
@@ -11482,11 +11355,7 @@
   }
 }
 
-/* V55 — desktop archive cursor consistency.
-   The site-wide custom cursor hides the native cursor on fine pointers.
-   Some later archive hit-area rules reintroduced `cursor: pointer !important`,
-   which won the cascade and exposed the browser cursor over song rows.
-   Keep the entire clickable song card on the custom cursor instead. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   .song-row,
   .song-row *,
@@ -11501,10 +11370,7 @@
   }
 }
 
-/* V56 — hard-stop the native cursor over desktop archive rows.
-   Older high-specificity !important cursor:pointer rules can beat generic
-   cursor:none selectors. Scope this to #songList and the active custom-cursor
-   root so every descendant and pseudo-element is forced to the custom cursor. */
+
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   html.custom-cursor-active body #songList.song-list .song-row,
   html.custom-cursor-active body #songList.song-list .song-row *,
@@ -11519,11 +11385,7 @@
   }
 }
 
-/* V57 — mobile horizontal stability.
-   Touch browsers may briefly focus/reveal a tapped control, and intrinsic
-   widths from the playing/note action row can otherwise influence the song
-   card's inline size. Lock the archive row to the viewport's existing content
-   width and keep every interaction state on the same horizontal origin. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .archive,
   .song-list,
@@ -11564,7 +11426,7 @@
     contain: none !important;
   }
 
-  /* Keep title/artist/note on exactly the same x-origin in every state. */
+  
   .song-list .song-row .song-title,
   .song-list .song-row:hover .song-title,
   .song-list .song-row:focus-within .song-title,
@@ -11590,16 +11452,14 @@
     translate: none !important;
   }
 
-  /* A read NEW marker remains a layout placeholder until the next render, so
-     starting playback never changes the title's flex/block formatting model. */
+  
   .song-list .song-row.is-new-read .latest-song-marker.is-read-placeholder {
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
   }
 
-  /* Touch-only controls must not cause focus-scroll nudges. They remain fully
-     clickable; this simply removes browser focus geometry from touch use. */
+  
   .song-list .song-row .song-title,
   .song-list .song-row .mobile-details-toggle,
   .song-list .song-row .play-song,
@@ -11609,8 +11469,7 @@
   }
 }
 
-/* V58 — mobile expanded note/action strip: equal vertical breathing room.
-   Preserve the existing total 20px vertical padding while balancing it evenly. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-list .song-row.mobile-expanded .row-expanded,
   .song-list .song-row.mobile-expanded:hover .row-expanded,
@@ -11622,12 +11481,7 @@
 }
 
 
-/* V60 — precise mobile first-line alignment.
-   The title's first rendered line width is measured in JS and exposed through
-   --mobile-first-line-width. NEW is absolutely positioned immediately after
-   that first line, so wrapped titles no longer push the badge to the far edge.
-   The song number is centered for one-line titles and bottom-aligned to the
-   first line when the title wraps. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-list .song-row .song-number-rail,
   .song-list .song-row:hover .song-number-rail,
@@ -11644,7 +11498,7 @@
   .song-list .song-row.is-title-multiline:active .song-number-rail,
   .song-list .song-row.is-title-multiline.is-playing .song-number-rail,
   .song-list .song-row.is-title-multiline.mobile-expanded .song-number-rail {
-    /* 19.55px title line-height - ~10px number line box = 9.55px. */
+    
     transform: translateY(9.5px) !important;
   }
 
@@ -11716,9 +11570,7 @@
 }
 
 
-/* V61 — optical correction for wrapped mobile song numbers.
-   V60 placed the number's visible bottom ~5px below the first title line.
-   Keep one-line positioning untouched; wrapped titles use the corrected offset. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .song-list .song-row.is-title-multiline .song-number-rail,
   .song-list .song-row.is-title-multiline:hover .song-number-rail,
@@ -11731,11 +11583,7 @@
 }
 
 
-/* V62 — hard mobile horizontal-coordinate lock.
-   The remaining intermittent shift came from viewport/scroll-gutter changes
-   when the fixed player opens plus touch-browser horizontal rubber-band.
-   Keep the document width stable and allow only vertical touch panning inside
-   the archive. No song interaction state is allowed to alter the x-origin. */
+
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   html {
     width: 100% !important;
@@ -11785,7 +11633,7 @@
     contain: none !important;
   }
 
-  /* One authoritative left guide for the visible copy column. */
+  
   .song-list .song-row {
     --mobile-copy-inset: calc(2.25rem + 9px);
   }
@@ -11837,3 +11685,1821 @@
     --mobile-copy-inset: calc(2rem + 9px);
   }
 }
+
+
+
+.wall-view {
+  padding: 0 var(--pad) clamp(72px, 9vw, 140px);
+}
+
+.wall-view[hidden] { display: none !important; }
+
+.wall-head {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.wall-prototype-note { opacity: .58; font-weight: 500; }
+
+.cover-wall {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.25vw, 18px);
+  padding-top: clamp(12px, 1.6vw, 24px);
+}
+
+.album-cluster {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: clamp(10px, 1.25vw, 18px);
+}
+
+.album-cluster-feature {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  align-items: stretch;
+}
+
+.album-cluster-feature.is-reverse > .album-wall-card.is-feature { order: 2; }
+.album-cluster-feature.is-reverse > .album-cluster-small-grid { order: 1; }
+
+.album-cluster-small-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 1.25vw, 18px);
+}
+
+.album-cluster-trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.album-cluster-tail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.album-cluster-tail:has(.album-wall-card:only-child) { grid-template-columns: minmax(0, .48fr); }
+
+.album-wall-card { min-width: 0; }
+
+.album-wall-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: rgba(0,0,0,.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+.album-wall-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.002);
+  transition: transform .46s var(--ease), filter .46s var(--ease);
+}
+
+.album-wall-top {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.album-song-count,
+.album-cover-source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 4px 5px 3px;
+  background: var(--bg);
+  color: var(--ink);
+  font: normal 700 8px/1 Inter, Arial, sans-serif;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.album-wall-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: clamp(40px, 7vw, 96px) clamp(10px, 1.2vw, 18px) clamp(10px, 1.2vw, 18px);
+  background: linear-gradient(to top, rgba(0,0,0,.86) 0%, rgba(0,0,0,.32) 52%, rgba(0,0,0,0) 76%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.album-wall-name {
+  max-width: 92%;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.3rem, 2vw, 2.15rem);
+  line-height: .92;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -.027em;
+}
+
+.album-wall-card.is-feature .album-wall-name {
+  font-size: clamp(2rem, 4.6vw, 5.2rem);
+  max-width: 86%;
+}
+
+.album-wall-artist {
+  margin-top: 5px;
+  font: normal 650 10px/1.1 Inter, Arial, sans-serif;
+  text-transform: uppercase;
+}
+
+.album-track-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: clamp(9px, 1.2vw, 15px);
+  border-top: 1px solid rgba(255,255,255,.45);
+}
+
+.album-track-button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,.26);
+  background: transparent;
+  color: inherit;
+  padding: 6px 0 5px;
+  text-align: left;
+  font: normal 500 9px/1.1 Inter, Arial, sans-serif;
+}
+
+.album-track-button > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-track-button > span:last-child {
+  opacity: .66;
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.album-track-more {
+  padding-top: 7px;
+  font: normal 650 8px/1 Inter, Arial, sans-serif;
+  opacity: .68;
+}
+
+.album-wall-loading,
+.wall-empty {
+  padding: 42px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: .78rem;
+  text-transform: uppercase;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .album-wall-art:hover img,
+  .album-wall-art:focus-visible img {
+    transform: scale(1.045);
+    filter: saturate(.88) contrast(1.04);
+  }
+  .album-wall-art:hover .album-wall-overlay,
+  .album-wall-art:focus-visible .album-wall-overlay {
+    opacity: 1;
+    transform: none;
+  }
+  .album-track-button:hover,
+  .album-track-button:focus-visible {
+    color: var(--accent, #E7FE00);
+  }
+}
+
+@media (max-width: 960px) {
+  .album-cluster-feature { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .view-switch { gap: 0 !important; }
+  .view-switch .view-button { padding-left: 7px !important; padding-right: 7px !important; }
+
+  .wall-view { padding-left: var(--pad); padding-right: var(--pad); padding-bottom: 84px; }
+  .wall-head { min-height: 38px; align-items: flex-start; flex-direction: column; justify-content: center; gap: 3px; }
+  .wall-prototype-note { font-size: 8px; }
+  .cover-wall { gap: 7px; padding-top: 10px; }
+
+  .album-cluster,
+  .album-cluster-feature,
+  .album-cluster-trio,
+  .album-cluster-tail,
+  .album-cluster-tail:has(.album-wall-card:only-child) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .album-cluster-feature.is-reverse > .album-wall-card.is-feature,
+  .album-cluster-feature.is-reverse > .album-cluster-small-grid { order: initial; }
+
+  .album-cluster-small-grid { display: contents; }
+
+  .album-wall-card.is-feature {
+    grid-column: span 2;
+  }
+
+  .album-wall-top { top: 6px; left: 6px; right: 6px; }
+  .album-song-count, .album-cover-source { min-height: 16px; padding: 3px 4px; font-size: 7px; }
+
+  .album-wall-overlay {
+    opacity: 1;
+    transform: none;
+    justify-content: flex-end;
+    padding: 42px 8px 8px;
+    background: linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,.18) 58%, transparent 80%);
+  }
+
+  .album-wall-name { font-size: 1.15rem; max-width: 96%; }
+  .album-wall-card.is-feature .album-wall-name { font-size: clamp(1.75rem, 9vw, 2.65rem); max-width: 90%; }
+  .album-wall-artist { margin-top: 3px; font-size: 8px; }
+
+  .album-track-list { margin-top: 7px; }
+  .album-track-button {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 5px;
+    padding: 5px 0 4px;
+    font-size: 8px;
+  }
+  .album-track-button > span:last-child { display: none; }
+
+  
+  .album-wall-card:not(.is-feature):not(.has-multiple) .album-track-list { display: none; }
+}
+
+@media (max-width: 370px) {
+  .cover-wall,
+  .album-cluster,
+  .album-cluster-feature,
+  .album-cluster-trio,
+  .album-cluster-tail { gap: 5px; }
+  .album-wall-name { font-size: 1rem; }
+}
+
+
+
+.wall-view {
+  padding: 0 var(--pad) clamp(90px, 12vw, 170px) !important;
+}
+
+.wall-head {
+  min-height: 44px !important;
+  padding: 9px 0 8px !important;
+  font-size: 10px !important;
+  letter-spacing: .045em !important;
+}
+
+.wall-intro {
+  min-height: clamp(330px, 47vw, 660px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(48px, 8vw, 120px) 20px clamp(42px, 7vw, 90px);
+}
+
+.wall-intro-kicker {
+  margin-bottom: clamp(20px, 2.4vw, 36px);
+  font: normal 600 9px/1 Inter, Arial, sans-serif;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+  opacity: .68;
+}
+
+.wall-intro h2 {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  font-size: clamp(4rem, 10vw, 10rem);
+  line-height: .78;
+  font-weight: 400;
+  letter-spacing: -.075em;
+  text-transform: lowercase;
+}
+
+.wall-intro p {
+  max-width: 470px;
+  margin: clamp(24px, 3vw, 42px) 0 0;
+  font: normal 500 clamp(12px, 1.05vw, 15px)/1.12 Inter, Arial, sans-serif;
+  letter-spacing: -.025em;
+}
+
+.cover-wall {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding-top: 0 !important;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.album-editorial-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: 100%;
+}
+
+.album-editorial-cell {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.album-editorial-art {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border-top: 0;
+  border-left: 0;
+  background: rgba(0,0,0,.08);
+  color: var(--ink);
+  text-align: left;
+}
+
+.album-editorial-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.002);
+  transition: transform .42s var(--ease), filter .42s var(--ease);
+}
+
+.album-editorial-index,
+.album-editorial-play {
+  position: absolute;
+  z-index: 2;
+  top: 7px;
+  display: inline-flex;
+  min-height: 17px;
+  align-items: center;
+  padding: 3px 4px 2px;
+  background: var(--bg);
+  color: var(--ink);
+  font: normal 700 7px/1 Inter, Arial, sans-serif;
+}
+
+.album-editorial-index { left: 7px; }
+.album-editorial-play { right: 7px; font-size: 6px; }
+
+.album-editorial-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  padding: clamp(9px, 1vw, 16px);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.album-editorial-eyebrow {
+  position: absolute;
+  top: clamp(9px, 1vw, 16px);
+  left: clamp(9px, 1vw, 16px);
+  right: clamp(9px, 1vw, 16px);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font: normal 600 7px/1 Inter, Arial, sans-serif;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+  opacity: .68;
+}
+
+.album-editorial-name {
+  margin: 0;
+  max-width: 96%;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.05rem, 1.55vw, 1.75rem);
+  line-height: .9;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -.024em;
+  overflow-wrap: anywhere;
+}
+
+.album-editorial-artist {
+  margin: 5px 0 0;
+  font: normal 650 8px/1.05 Inter, Arial, sans-serif;
+  text-transform: uppercase;
+}
+
+.album-editorial-tracks {
+  display: flex;
+  flex-direction: column;
+  margin-top: clamp(9px, 1vw, 14px);
+  border-top: 1px solid currentColor;
+}
+
+.album-editorial-track {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) max-content;
+  gap: 5px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 0 4px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 42%, transparent);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: normal 500 7px/1 Inter, Arial, sans-serif;
+}
+
+
+
+.album-editorial-more {
+  padding-top: 5px;
+  font: normal 650 6px/1 Inter, Arial, sans-serif;
+  opacity: .62;
+}
+
+.album-editorial-spacer {
+  pointer-events: none;
+}
+
+.album-editorial-spacer.is-blank {
+  background: transparent;
+}
+
+.album-editorial-spacer.is-solid {
+  background: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img {
+    transform: scale(1.035);
+    filter: saturate(.88) contrast(1.05);
+  }
+
+  .album-editorial-track:hover,
+  .album-editorial-track:focus-visible {
+    background: var(--ink);
+    color: var(--bg);
+  }
+}
+
+@media (max-width: 1080px) and (min-width: 769px) {
+  .album-editorial-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .album-editorial-row > :nth-child(n+5) {
+    display: none;
+  }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .wall-view {
+    padding-left: var(--pad) !important;
+    padding-right: var(--pad) !important;
+    padding-bottom: 90px !important;
+  }
+
+  .wall-head {
+    min-height: 38px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    font-size: 8px !important;
+  }
+
+  .wall-prototype-note {
+    margin-left: auto;
+    text-align: right;
+    font-size: 7px !important;
+  }
+
+  .wall-intro {
+    min-height: 310px;
+    padding: 52px 12px 46px;
+  }
+
+  .wall-intro-kicker {
+    margin-bottom: 18px;
+    font-size: 7px;
+  }
+
+  .wall-intro h2 {
+    font-size: clamp(3.3rem, 17vw, 5.2rem);
+  }
+
+  .wall-intro p {
+    max-width: 280px;
+    margin-top: 22px;
+    font-size: 10px;
+    line-height: 1.12;
+  }
+
+  .album-editorial-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  
+  .album-editorial-spacer { display: none; }
+
+  .album-editorial-row {
+    display: contents;
+  }
+
+  .cover-wall {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .album-editorial-cell {
+    aspect-ratio: 1;
+  }
+
+  .album-editorial-info {
+    padding: 9px;
+  }
+
+  .album-editorial-eyebrow {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    font-size: 5.5px;
+  }
+
+  .album-editorial-name {
+    font-size: clamp(.95rem, 4.6vw, 1.25rem);
+  }
+
+  .album-editorial-artist {
+    margin-top: 3px;
+    font-size: 6.5px;
+  }
+
+  .album-editorial-tracks {
+    margin-top: 7px;
+  }
+
+  .album-editorial-track {
+    grid-template-columns: 15px minmax(0, 1fr);
+    gap: 3px;
+    padding: 4px 0 3px;
+    font-size: 6px;
+  }
+  .album-editorial-more { font-size: 5px; }
+
+  
+  .album-editorial-info:not(.has-multiple) .album-editorial-track {
+    border-bottom: 0;
+  }
+
+  .album-editorial-index,
+  .album-editorial-play {
+    top: 5px;
+    min-height: 14px;
+    padding: 3px 3px 2px;
+    font-size: 5.5px;
+  }
+  .album-editorial-index { left: 5px; }
+  .album-editorial-play { right: 5px; font-size: 5px; }
+}
+
+@media (max-width: 380px) {
+  .album-editorial-info { padding: 7px; }
+  .album-editorial-eyebrow { top: 6px; left: 6px; right: 6px; }
+  .album-editorial-name { font-size: .9rem; }
+  .album-editorial-track { padding-top: 3px; padding-bottom: 3px; }
+}
+
+
+
+.wall-intro { display: none !important; }
+.cover-wall {
+  border: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+}
+.album-editorial-cell {
+  border: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+}
+
+
+
+.album-editorial-index,
+.album-editorial-play,
+.album-editorial-eyebrow {
+  display: none !important;
+}
+
+.album-editorial-info {
+  justify-content: flex-start !important;
+  padding: clamp(13px, 1.25vw, 20px) !important;
+  background: var(--bg) !important;
+  overflow: hidden !important;
+}
+
+.album-editorial-name {
+  margin: 0 !important;
+  max-width: 100% !important;
+  font-family: Inter, Arial, sans-serif !important;
+  font-size: clamp(.9rem, 1.05vw, 1.2rem) !important;
+  line-height: .94 !important;
+  font-weight: 750 !important;
+  font-style: normal !important;
+  letter-spacing: -.045em !important;
+  text-transform: none !important;
+}
+
+.album-editorial-artist {
+  margin: 2px 0 0 !important;
+  font: normal 650 clamp(8px, .72vw, 10px)/1 Inter, Arial, sans-serif !important;
+  letter-spacing: -.02em !important;
+  text-transform: none !important;
+}
+
+.album-editorial-tracks {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+  margin: 7px 0 0 !important;
+  border: 0 !important;
+}
+
+.album-editorial-track {
+  display: block !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  text-align: left !important;
+  font: normal 500 clamp(7px, .66vw, 9px)/1.08 Inter, Arial, sans-serif !important;
+  letter-spacing: -.015em !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.album-editorial-track + .album-editorial-track {
+  margin-top: 1px !important;
+}
+
+.album-editorial-more {
+  margin-top: 3px !important;
+  padding: 0 !important;
+  font: normal 650 6px/1 Inter, Arial, sans-serif !important;
+  letter-spacing: .02em !important;
+  opacity: .55 !important;
+}
+
+.album-editorial-meta {
+  margin: auto 0 0 !important;
+  padding-top: 10px !important;
+  font: normal 600 clamp(6px, .58vw, 8px)/1.08 Inter, Arial, sans-serif !important;
+  letter-spacing: .01em !important;
+  text-transform: uppercase !important;
+  opacity: .7 !important;
+}
+
+.album-editorial-art {
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .album-editorial-track:hover,
+  .album-editorial-track:focus-visible {
+    background: transparent !important;
+    color: inherit !important;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-info {
+    padding: 9px !important;
+  }
+
+  .album-editorial-name {
+    font-size: clamp(.78rem, 3.8vw, 1rem) !important;
+    line-height: .95 !important;
+  }
+
+  .album-editorial-artist {
+    margin-top: 2px !important;
+    font-size: 6.5px !important;
+  }
+
+  .album-editorial-tracks {
+    margin-top: 6px !important;
+  }
+
+  .album-editorial-track {
+    font-size: 6px !important;
+    line-height: 1.08 !important;
+  }
+
+  .album-editorial-meta {
+    padding-top: 6px !important;
+    font-size: 5.5px !important;
+  }
+}
+
+
+
+.album-editorial-info {
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  padding: clamp(15px, 1.45vw, 24px) !important;
+}
+
+.album-editorial-name,
+.album-editorial-artist,
+.album-editorial-track,
+.album-editorial-meta {
+  font-family: Inter, Arial, sans-serif !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  font-size: clamp(1rem, 1.28vw, 1.48rem) !important;
+  line-height: .9 !important;
+  letter-spacing: -.055em !important;
+  text-transform: none !important;
+}
+
+.album-editorial-name {
+  margin: 0 !important;
+}
+
+.album-editorial-artist {
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+
+.album-editorial-tracks {
+  margin: 0 !important;
+  gap: 0 !important;
+}
+
+.album-editorial-track {
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 1 !important;
+}
+
+.album-editorial-track + .album-editorial-track {
+  margin-top: 0 !important;
+}
+
+.album-editorial-more {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-family: Inter, Arial, sans-serif !important;
+  font-size: clamp(.82rem, 1vw, 1.1rem) !important;
+  line-height: .9 !important;
+  font-weight: 700 !important;
+  letter-spacing: -.045em !important;
+  text-transform: none !important;
+  opacity: 1 !important;
+}
+
+.album-editorial-meta {
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: pre-line !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-info {
+    padding: 10px !important;
+  }
+
+  .album-editorial-name,
+  .album-editorial-artist,
+  .album-editorial-track,
+  .album-editorial-meta {
+    font-size: clamp(.72rem, 3.25vw, .92rem) !important;
+    line-height: .92 !important;
+    letter-spacing: -.045em !important;
+  }
+
+  .album-editorial-more {
+    font-size: .66rem !important;
+    line-height: .92 !important;
+  }
+}
+
+
+
+.album-editorial-name,
+.album-editorial-artist {
+  font-family: Inter, Arial, sans-serif !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  font-size: clamp(1.05rem, 1.42vw, 1.62rem) !important;
+  line-height: .9 !important;
+  letter-spacing: -.058em !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+
+.album-editorial-artist {
+  margin-top: 1px !important;
+}
+
+.album-editorial-tracks {
+  margin-top: clamp(8px, .65vw, 12px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.album-editorial-track {
+  font-family: Inter, Arial, sans-serif !important;
+  font-style: normal !important;
+  font-weight: 500 !important;
+  font-size: clamp(.68rem, .72vw, .84rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.025em !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 1 !important;
+  text-align: left !important;
+}
+
+.album-editorial-track + .album-editorial-track {
+  margin-top: 1px !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-name,
+  .album-editorial-artist {
+    font-size: clamp(.9rem, 4vw, 1.12rem) !important;
+    line-height: .92 !important;
+  }
+
+  .album-editorial-tracks {
+    margin-top: 6px !important;
+    gap: 2px !important;
+  }
+
+  .album-editorial-track {
+    font-size: clamp(.62rem, 2.8vw, .76rem) !important;
+    line-height: 1.08 !important;
+  }
+}
+
+
+
+.album-editorial-track {
+  font-size: clamp(.78rem, .84vw, .98rem) !important;
+  line-height: 1.08 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-track {
+    font-size: clamp(.68rem, 3.05vw, .84rem) !important;
+    line-height: 1.08 !important;
+  }
+}
+
+
+
+.album-editorial-track {
+  font-size: clamp(.94rem, 1.02vw, 1.18rem) !important;
+  line-height: 1.04 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-track {
+    font-size: clamp(.78rem, 3.55vw, .98rem) !important;
+    line-height: 1.05 !important;
+  }
+}
+
+
+
+.album-editorial-track {
+  font-size: clamp(1.08rem, 1.18vw, 1.36rem) !important;
+  line-height: 1.02 !important;
+  font-weight: 600 !important;
+  letter-spacing: -.035em !important;
+}
+
+.album-editorial-info {
+  min-width: 0 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-track {
+    font-size: clamp(.9rem, 4vw, 1.08rem) !important;
+    line-height: 1.04 !important;
+  }
+}
+
+
+
+.wall-view > .wall-head {
+  display: none !important;
+}
+
+.album-editorial-track {
+  font-size: clamp(1.28rem, 1.42vw, 1.62rem) !important;
+  line-height: 1.02 !important;
+  font-weight: 600 !important;
+  letter-spacing: -.038em !important;
+}
+
+.album-editorial-track > span {
+  display: inline !important;
+  font: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-track {
+    font-size: clamp(1rem, 4.7vw, 1.22rem) !important;
+    line-height: 1.04 !important;
+  }
+
+  .album-editorial-track > span {
+    font: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+}
+
+
+
+.album-editorial-track,
+.album-editorial-track > span {
+  font-family: Inter, Arial, sans-serif !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  font-size: clamp(.88rem, .96vw, 1.08rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.022em !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-editorial-track,
+  .album-editorial-track > span {
+    font-size: clamp(.76rem, 3.35vw, .94rem) !important;
+    line-height: 1.08 !important;
+    font-weight: 400 !important;
+  }
+}
+
+
+
+.wall-filter-defs {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art {
+    position: relative !important;
+    overflow: hidden !important;
+    background: #5f7cff !important;
+    isolation: isolate !important;
+  }
+
+  .album-editorial-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    background: var(--bg, #5f7cff);
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 .62px, transparent .72px);
+    mask-image: radial-gradient(circle at center, #000 0 .62px, transparent .72px);
+    -webkit-mask-size: 3px 3px;
+    mask-size: 3px 3px;
+    transition: opacity 110ms linear;
+  }
+
+  .album-editorial-art img {
+    position: relative;
+    z-index: 1;
+    transform: scale(1) !important;
+    filter: none !important;
+    transition:
+      filter 110ms linear,
+      transform 340ms cubic-bezier(.22, 1, .36, 1) !important;
+    will-change: filter, transform;
+    backface-visibility: hidden;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img {
+    filter: url("#wallBitmapDuotone") !important;
+    transform: scale(1.025) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after {
+    opacity: .68;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-editorial-art img,
+  .album-editorial-art::after {
+    transition: none !important;
+  }
+}
+
+
+
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art img {
+    transition:
+      filter 180ms ease,
+      transform 520ms cubic-bezier(.16, 1, .3, 1) !important;
+  }
+
+  .album-editorial-art::after {
+    transition: opacity 220ms ease !important;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img {
+    transform: scale(1.02) !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art::after {
+    opacity: 0;
+    background: var(--bg, #5f7cff);
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 .52px, transparent .64px);
+    mask-image: radial-gradient(circle at center, #000 0 .52px, transparent .64px);
+    -webkit-mask-size: 3.4px 3.4px;
+    mask-size: 3.4px 3.4px;
+    transition: opacity 260ms ease !important;
+  }
+
+  .album-editorial-art img {
+    transition:
+      filter 220ms ease,
+      transform 560ms cubic-bezier(.16, 1, .3, 1) !important;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") saturate(.95) brightness(.94) !important;
+    transform: scale(1.018) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .34 !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") saturate(1.06) brightness(.985) contrast(1.04) !important;
+    transform: scale(1.02) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .26 !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") !important;
+    transform: scale(1.02) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .18 !important;
+    background: #5f7cff !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") !important;
+    transform: scale(1.02) !important;
+  }
+
+  .album-editorial-art::after {
+    background: #5f7cff !important;
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 .42px, transparent .52px) !important;
+    mask-image: radial-gradient(circle at center, #000 0 .42px, transparent .52px) !important;
+    -webkit-mask-size: 3.8px 3.8px !important;
+    mask-size: 3.8px 3.8px !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .10 !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    background-image:
+      linear-gradient(rgba(95, 124, 255, .34) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(95, 124, 255, .34) 1px, transparent 1px);
+    background-size: 4px 4px;
+    mix-blend-mode: multiply;
+    transition: opacity 260ms ease;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") !important;
+    transform: scale(1.018) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .045 !important;
+    background: #5f7cff !important;
+  }
+
+  .album-editorial-art:hover::before,
+  .album-editorial-art:focus-visible::before,
+  .album-editorial-art.is-bitmap-hover::before {
+    opacity: .34;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-editorial-art::before {
+    transition: none !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art::before {
+    background-image: none !important;
+    opacity: 0 !important;
+  }
+
+  .album-editorial-art::after {
+    background: #5f7cff !important;
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 0.9px, transparent 1.15px) !important;
+    mask-image: radial-gradient(circle at center, #000 0 0.9px, transparent 1.15px) !important;
+    -webkit-mask-size: 6px 6px !important;
+    mask-size: 6px 6px !important;
+    -webkit-mask-position: 0 0 !important;
+    mask-position: 0 0 !important;
+    mix-blend-mode: multiply !important;
+    opacity: 0 !important;
+    transition: opacity 240ms ease !important;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") brightness(.93) contrast(1.03) !important;
+    transform: scale(1.018) !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .16 !important;
+  }
+
+  .album-editorial-art:hover::before,
+  .album-editorial-art:focus-visible::before,
+  .album-editorial-art.is-bitmap-hover::before {
+    opacity: 0 !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art {
+    overflow: hidden;
+  }
+
+  .album-editorial-art img {
+    transition:
+      filter 220ms ease,
+      transform 520ms cubic-bezier(.16, 1, .3, 1) !important;
+  }
+
+  
+  .album-editorial-art::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    background: #5f7cff;
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 0.78px, transparent 1.02px) !important;
+    mask-image: radial-gradient(circle at center, #000 0 0.78px, transparent 1.02px) !important;
+    -webkit-mask-size: 4.2px 4.2px !important;
+    mask-size: 4.2px 4.2px !important;
+    -webkit-mask-position: 0 0 !important;
+    mask-position: 0 0 !important;
+    mix-blend-mode: multiply;
+    transition: opacity 220ms ease !important;
+  }
+
+  
+  .album-editorial-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    opacity: 0;
+    background: #5f7cff;
+    -webkit-mask-image: radial-gradient(circle at center, #000 0 1.28px, transparent 1.6px) !important;
+    mask-image: radial-gradient(circle at center, #000 0 1.28px, transparent 1.6px) !important;
+    -webkit-mask-size: 7px 7px !important;
+    mask-size: 7px 7px !important;
+    -webkit-mask-position: 2px 2px !important;
+    mask-position: 2px 2px !important;
+    mix-blend-mode: multiply;
+    transition: opacity 220ms ease !important;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img {
+    filter: url("#wallBitmapDuotone") brightness(.95) contrast(1.06) !important;
+    transform: scale(1.018) !important;
+  }
+
+  .album-editorial-art:hover::before,
+  .album-editorial-art:focus-visible::before,
+  .album-editorial-art.is-bitmap-hover::before {
+    opacity: .16 !important;
+  }
+
+  .album-editorial-art:hover::after,
+  .album-editorial-art:focus-visible::after,
+  .album-editorial-art.is-bitmap-hover::after {
+    opacity: .11 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-editorial-art img,
+  .album-editorial-art::before,
+  .album-editorial-art::after {
+    transition: none !important;
+  }
+}
+
+
+
+.album-halftone-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.002);
+  transform-origin: center;
+  transition:
+    opacity 190ms ease,
+    transform 520ms cubic-bezier(.16, 1, .3, 1);
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art::before,
+  .album-editorial-art::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img,
+  .album-editorial-art.is-bitmap-hover img,
+  .album-editorial-art.is-real-halftone img {
+    filter: none !important;
+    transform: scale(1.018) !important;
+  }
+
+  .album-editorial-art.is-real-halftone .album-halftone-canvas {
+    opacity: 1;
+    transform: scale(1.018);
+  }
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .album-halftone-canvas {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-halftone-canvas {
+    transition: none !important;
+  }
+}
+
+
+
+.album-halftone-canvas {
+  transition:
+    opacity 210ms ease,
+    transform 560ms cubic-bezier(.16, 1, .3, 1) !important;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art.is-real-halftone .album-halftone-canvas {
+    opacity: 1;
+    transform: scale(1.016);
+  }
+}
+
+
+
+.album-halftone-canvas {
+  display: none !important;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .album-editorial-art::before,
+  .album-editorial-art::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .album-editorial-art img {
+    filter: none !important;
+    transform: scale(1) !important;
+    transition: transform 460ms cubic-bezier(.16, 1, .3, 1) !important;
+    will-change: transform;
+  }
+
+  .album-editorial-art:hover img,
+  .album-editorial-art:focus-visible img {
+    filter: none !important;
+    transform: scale(1.035) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-editorial-art img {
+    transition: none !important;
+  }
+}
+
+
+
+.album-editorial-art.is-youtube-artwork img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+
+.toolbar {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .toolbar {
+    padding-top: 11px !important;
+    padding-bottom: 11px !important;
+  }
+}
+
+
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  #songList .song-row {
+    --mobile-copy-inset: calc(2.25rem + 9px);
+    overflow-anchor: none !important;
+  }
+
+  #songList .song-row .row-main,
+  #songList .song-row:hover .row-main,
+  #songList .song-row:focus-within .row-main,
+  #songList .song-row:active .row-main,
+  #songList .song-row.is-playing .row-main,
+  #songList .song-row.mobile-expanded .row-main {
+    display: grid !important;
+    grid-template-columns: 2.25rem minmax(0, 1fr) max-content !important;
+    grid-template-rows: auto auto auto !important;
+    column-gap: 9px !important;
+    row-gap: 2px !important;
+    inline-size: 100% !important;
+    min-inline-size: 0 !important;
+    margin: 0 !important;
+    padding: 11px 0 9px !important;
+    inset: auto !important;
+    translate: none !important;
+    transform: none !important;
+  }
+
+  #songList .song-row .song-title,
+  #songList .song-row .song-artist,
+  #songList .song-row .expanded-copy,
+  #songList .song-row .expanded-note,
+  #songList .song-row:hover .song-title,
+  #songList .song-row:hover .song-artist,
+  #songList .song-row:focus-within .song-title,
+  #songList .song-row:focus-within .song-artist,
+  #songList .song-row:active .song-title,
+  #songList .song-row:active .song-artist,
+  #songList .song-row.is-playing .song-title,
+  #songList .song-row.is-playing .song-artist,
+  #songList .song-row.mobile-expanded .song-title,
+  #songList .song-row.mobile-expanded .song-artist,
+  #songList .song-row.mobile-expanded .expanded-copy,
+  #songList .song-row.mobile-expanded .expanded-note {
+    inset-inline: auto !important;
+    margin-inline: 0 !important;
+    padding-inline: 0 !important;
+    translate: none !important;
+    transform: none !important;
+  }
+
+  #songList .song-row .row-expanded,
+  #songList .song-row:hover .row-expanded,
+  #songList .song-row:focus-within .row-expanded,
+  #songList .song-row:active .row-expanded,
+  #songList .song-row.is-playing .row-expanded,
+  #songList .song-row.mobile-expanded .row-expanded {
+    box-sizing: border-box !important;
+    inline-size: 100% !important;
+    min-inline-size: 0 !important;
+    margin-inline: 0 !important;
+    padding-inline-start: var(--mobile-copy-inset) !important;
+    padding-inline-end: 0 !important;
+    inset-inline: auto !important;
+    translate: none !important;
+    transform: none !important;
+    overflow-anchor: none !important;
+  }
+
+  #songList .song-row .mobile-details-toggle,
+  #songList .song-row .mobile-details-toggle:hover,
+  #songList .song-row .mobile-details-toggle:active,
+  #songList .song-row .mobile-details-toggle:focus,
+  #songList .song-row .mobile-details-toggle:focus-visible,
+  #songList .song-row.mobile-expanded .mobile-details-toggle {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    outline: none !important;
+    inset: auto !important;
+    margin: 6px 0 0 !important;
+    padding: 0 !important;
+    translate: none !important;
+    transform: none !important;
+    scale: 1 !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation !important;
+  }
+}
+
+@media (max-width: 420px) {
+  #songList .song-row {
+    --mobile-copy-inset: calc(2rem + 9px);
+  }
+
+  #songList .song-row .row-main,
+  #songList .song-row:hover .row-main,
+  #songList .song-row:focus-within .row-main,
+  #songList .song-row:active .row-main,
+  #songList .song-row.is-playing .row-main,
+  #songList .song-row.mobile-expanded .row-main {
+    grid-template-columns: 2rem minmax(0, 1fr) max-content !important;
+  }
+}
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .player-bar {
+    box-shadow:
+      32px 0 0 var(--hover-bg),
+      0 -12px 35px rgba(0, 0, 0, .13) !important;
+  }
+
+  html:has(body.player-open),
+  body.player-open {
+    scrollbar-color: auto !important;
+  }
+
+  html:has(body.player-open)::-webkit-scrollbar-track,
+  html:has(body.player-open)::-webkit-scrollbar-thumb,
+  body.player-open::-webkit-scrollbar-track,
+  body.player-open::-webkit-scrollbar-thumb {
+    background: initial !important;
+    border-color: initial !important;
+  }
+}
+
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  #songList .song-row:hover::before,
+  #songList .song-row:focus-within::before,
+  #songList .song-row.is-playing:hover::before,
+  #songList .song-row.is-playing:focus-within::before {
+    left: calc(-1 * var(--pad)) !important;
+    right: auto !important;
+    width: 100vw !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .player-bar {
+    left: 0 !important;
+    right: auto !important;
+    width: 100vw !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    background: var(--hover-bg) !important;
+    box-shadow: 0 -12px 35px rgba(0, 0, 0, .13) !important;
+  }
+}
+
+
+.viewport-scrollbar {
+  display: none;
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  html {
+    scrollbar-width: none !important;
+    scrollbar-gutter: auto !important;
+  }
+
+  html::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+  }
+
+  
+  #songList .song-row:hover::before,
+  #songList .song-row:focus-within::before,
+  #songList .song-row.is-playing:hover::before,
+  #songList .song-row.is-playing:focus-within::before {
+    left: calc(-1 * var(--pad)) !important;
+    right: auto !important;
+    width: 100vw !important;
+    max-width: none !important;
+  }
+
+  .player-bar {
+    left: 0 !important;
+    right: auto !important;
+    width: 100vw !important;
+    max-width: none !important;
+  }
+
+  body.access-granted .viewport-scrollbar {
+    position: fixed;
+    z-index: 2147483644;
+    top: 3px;
+    right: 2px;
+    bottom: 3px;
+    width: 8px;
+    display: block;
+    pointer-events: none;
+  }
+
+  .viewport-scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    min-height: 28px;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, .48);
+    border: 1px solid rgba(255, 255, 255, .24);
+    box-shadow: 0 0 0 1px rgba(231, 254, 0, .18);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: none !important;
+    will-change: transform, height;
+  }
+
+  .viewport-scrollbar-thumb:hover,
+  .viewport-scrollbar-thumb.is-dragging {
+    background: rgba(17, 17, 17, .68);
+  }
+}
+
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .site-footer .giant-add {
+    display: block;
+    width: 100vw !important;
+    max-width: none !important;
+    margin-left: calc(-1 * var(--pad)) !important;
+    margin-right: calc(-1 * var(--pad)) !important;
+    padding-left: var(--pad) !important;
+    padding-right: var(--pad) !important;
+  }
+
+  .site-footer .giant-add:hover,
+  .site-footer .giant-add:focus-visible {
+    padding-left: calc(var(--pad) + 12px) !important;
+  }
+}
+
+
+body.wall-mode #filters,
+body.wall-mode .archive-tools .search-wrap {
+  display: none !important;
+}
+
+body.wall-mode .archive-tools {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+
+body.wall-mode #randomSong {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: end !important;
+}
+
+
+
+body.wall-mode #archiveTools > #filters,
+body.wall-mode #archiveTools > .search-wrap {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+body.wall-mode #archiveTools {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+
+body.wall-mode #archiveTools #randomSong {
+  display: inline-flex !important;
+  grid-column: 2 !important;
+  justify-self: end !important;
+}
+
+
+#closePlayer.player-close {
+  position: relative !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  flex: 0 0 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: currentColor !important;
+  font-size: 0 !important;
+  line-height: 1 !important;
+  cursor: none !important;
+  transform: rotate(0deg) !important;
+  transform-origin: 50% 50% !important;
+  transition: transform 280ms cubic-bezier(.2,.8,.2,1) !important;
+  will-change: transform;
+}
+
+#closePlayer.player-close::before,
+#closePlayer.player-close::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 1.5px;
+  background: currentColor;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+}
+
+#closePlayer.player-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+#closePlayer.player-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+#closePlayer.player-close:hover,
+#closePlayer.player-close:focus-visible {
+  transform: rotate(90deg) scale(1.06) !important;
+}
+
+#closePlayer.player-close:active {
+  transform: rotate(90deg) scale(.94) !important;
+}
+
+
+#playerTitle {
+  line-height: .94 !important;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  #closePlayer.player-close {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    flex-basis: 30px !important;
+  }
+
+  #closePlayer.player-close::before,
+  #closePlayer.player-close::after {
+    width: 17px;
+  }
+
+  #playerTitle {
+    line-height: .92 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #closePlayer.player-close {
+    transition: none !important;
+  }
+}
+
