@@ -2865,19 +2865,23 @@ function appendAlbumCollage(groups) {
   }
 }
 
-function wallVisibleSongSignature(songList = getVisibleSongs()) {
+function getWallSongs() {
+  return songs;
+}
+
+function wallVisibleSongSignature(songList = getWallSongs()) {
   return (songList || []).map(song => String(song.id)).join("|");
 }
 
 async function renderWall() {
   if (!coverWall || !wallEmpty) return;
   const token = ++wallRenderToken;
-  const visible = getVisibleSongs();
-  wallRenderedSongSignature = wallVisibleSongSignature(visible);
+  const wallSongs = getWallSongs();
+  wallRenderedSongSignature = wallVisibleSongSignature(wallSongs);
 
   wallEmpty.hidden = true;
 
-  if (!visible.length) {
+  if (!wallSongs.length) {
     coverWall.innerHTML = "";
     wallEmpty.hidden = false;
     if (wallAlbumCount) wallAlbumCount.textContent = "0 ALBUMS";
@@ -2887,7 +2891,7 @@ async function renderWall() {
   // Render immediately from Supabase metadata already present in the songs
   // query. Missing rows get a lightweight placeholder and are resolved in the
   // background, so opening WALL never waits on Bandcamp/Apple network calls.
-  const resolved = visible.map(song => ({
+  const resolved = wallSongs.map(song => ({
     song,
     album: hasStoredAlbumMetadata(song)
       ? storedAlbumForWall(song)
@@ -2903,7 +2907,7 @@ async function renderWall() {
 
   // Fire-and-forget background backfill. This is intentionally after the DOM
   // render so it cannot delay first paint.
-  ensureWallAlbumMetadata(visible);
+  ensureWallAlbumMetadata(wallSongs);
 }
 
 function setView(view) {
@@ -3088,7 +3092,7 @@ searchInput.addEventListener("input", event => {
 });
 
 document.querySelector("#randomSong").addEventListener("click", () => {
-  const visible = getVisibleSongs();
+  const visible = wallView && !wallView.hidden ? getWallSongs() : getVisibleSongs();
   if (!visible.length) return;
 
   const pick = visible[Math.floor(Math.random() * visible.length)];
@@ -3746,9 +3750,7 @@ function renderSongs() {
   renderStats();
   syncStatsPlayingState();
   if (wallView && !wallView.hidden) {
-    const nextWallSongSignature = wallVisibleSongSignature(visible);
-    // Preserve the current wall positions while only metadata changes. Rebuild
-    // only when the actual visible song set changes (add/delete/filter/search).
+    const nextWallSongSignature = wallVisibleSongSignature(getWallSongs());
     if (nextWallSongSignature !== wallRenderedSongSignature) renderWall();
   }
 
