@@ -13794,3 +13794,32 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
     margin-top: -2px !important;
   }
 }
+
+
+/* Background fallback standby: prepared invisibly while Spotify keeps playing. */
+.media-embed.spotify-mode {
+  position: relative;
+}
+
+.youtube-background-standby {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  z-index: 0 !important;
+}
+
+.youtube-background-standby iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}
+
+.media-embed.spotify-mode > .spotify-player-mount {
+  position: relative;
+  z-index: 1;
+}

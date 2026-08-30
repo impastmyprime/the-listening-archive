@@ -160,6 +160,12 @@ let youtubePlaybackWorker = null;
 let autoNextTransitionLock = false;
 let youtubeAutoQueue = [];
 let youtubeNativeQueueActive = false;
+let youtubeStandbyPlayer = null;
+let youtubeStandbyMountToken = 0;
+let youtubeStandbySong = null;
+let youtubeStandbyQueue = [];
+let youtubeStandbyPrimed = false;
+let youtubeStandbyPriming = false;
 
 let spotifyIframeApiPromise = null;
 let spotifyIframeApi = null;
@@ -1861,11 +1867,9 @@ async function bootstrapSupabase() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") {
     if (currentSource === "spotify" && spotifyPlaybackMode === "full" && spotifyHasStarted) {
-      // Move an active Spotify session to YouTube immediately when the page is
-      // hidden. Waiting until Spotify ends makes the new YouTube autoplay
-      // request arrive too late for reliable background playback.
-      if (handoffActiveSpotifyToYouTube()) return;
-
+      // Leaving the tab only arms the fallback. Spotify keeps playing until
+      // the current track ends; YouTube takes over only for the next song.
+      void prepareSpotifyBackgroundYouTubeStandby();
       startSpotifyAutoNextWatchdog();
       syncSpotifyAutoNextDeadline();
     }
@@ -2021,10 +2025,28 @@ backToTop.addEventListener("click", () => {
   });
 });
 
+function destroyYouTubeStandby() {
+  youtubeStandbyMountToken++;
+
+  if (youtubeStandbyPlayer && typeof youtubeStandbyPlayer.destroy === "function") {
+    try {
+      youtubeStandbyPlayer.destroy();
+    } catch { }
+  }
+
+  youtubeStandbyPlayer = null;
+  youtubeStandbySong = null;
+  youtubeStandbyQueue = [];
+  youtubeStandbyPrimed = false;
+  youtubeStandbyPriming = false;
+  mediaEmbed?.querySelector(".youtube-background-standby")?.remove();
+}
+
 function destroyYouTubePlayer() {
   youtubeMountToken++;
   youtubeAutoQueue = [];
   youtubeNativeQueueActive = false;
+  destroyYouTubeStandby();
 
   if (youtubePlayer && typeof youtubePlayer.destroy === "function") {
     try {
@@ -2374,52 +2396,269 @@ function nextYouTubeSong(currentId) {
   return null;
 }
 
-function estimatedSpotifyPositionSeconds() {
-  let position = Math.max(0, Number(spotifyLastPosition || 0));
-
-  if (!spotifyLastPaused && spotifyLastUpdateAt) {
-    position += Math.max(0, Date.now() - spotifyLastUpdateAt);
-  }
-
-  if (spotifyLastDuration > 0) {
-    position = Math.min(position, spotifyLastDuration);
-  }
-
-  return position / 1000;
-}
-
-function handoffActiveSpotifyToYouTube() {
+async function prepareSpotifyBackgroundYouTubeStandby() {
   if (
-    !document.hidden ||
     !autoNextEnabled ||
     currentSource !== "spotify" ||
     spotifyPlaybackMode !== "full" ||
-    !spotifyHasStarted ||
-    spotifyInterstitialActive ||
-    autoNextTransitionLock
+    !currentSongId
   ) {
     return false;
   }
 
-  const currentSong = songs.find(
-    song => String(song.id) === String(currentSongId)
-  );
-  const videoId = getYouTubeVideoId(currentSong?.youtubeUrl);
-  if (!currentSong || !videoId) return false;
+  const sourceSongId = currentSongId;
+  const nextSong = nextYouTubeSong(sourceSongId);
+  const videoId = getYouTubeVideoId(nextSong?.youtubeUrl);
 
-  const startSeconds = estimatedSpotifyPositionSeconds();
+  if (!nextSong || !videoId) {
+    destroyYouTubeStandby();
+    return false;
+  }
+
+  if (
+    youtubeStandbySong &&
+    String(youtubeStandbySong.id) === String(nextSong.id) &&
+    mediaEmbed.querySelector(".youtube-background-standby")
+  ) {
+    return youtubeStandbyPrimed;
+  }
+
+  destroyYouTubeStandby();
+  const standbyToken = ++youtubeStandbyMountToken;
+
+  const mount = document.createElement("div");
+  mount.className = "youtube-background-standby";
+  mount.setAttribute("aria-hidden", "true");
+  mediaEmbed.appendChild(mount);
+
+  youtubeStandbySong = nextSong;
+  youtubeStandbyQueue = buildYouTubeAutoQueue(nextSong);
+  if (!youtubeStandbyQueue.length) {
+    youtubeStandbyQueue = [{ song: nextSong, videoId }];
+  }
+
+  try {
+    const YT = await ensureYouTubeApi();
+
+    if (
+      standbyToken !== youtubeStandbyMountToken ||
+      currentSource !== "spotify" ||
+      String(currentSongId) !== String(sourceSongId) ||
+      !mount.isConnected
+    ) {
+      return false;
+    }
+
+    const playlistIds = youtubeStandbyQueue
+      .map(item => item.videoId)
+      .filter(Boolean);
+
+    youtubeStandbyPlayer = new YT.Player(mount, {
+      width: "100%",
+      height: "152",
+      videoId,
+      host: "https://www.youtube.com",
+      playerVars: {
+        autoplay: 0,
+        playsinline: 1,
+        rel: 0,
+        origin: window.location.origin
+      },
+      events: {
+        onReady: event => {
+          if (standbyToken !== youtubeStandbyMountToken) return;
+
+          const iframe = event.target.getIframe?.();
+          if (iframe) {
+            iframe.referrerPolicy = "strict-origin-when-cross-origin";
+            iframe.allow =
+              "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+          }
+
+          try {
+            event.target.mute?.();
+            event.target.setVolume?.(0);
+            youtubeStandbyPriming = true;
+
+            if (
+              autoNextEnabled &&
+              playlistIds.length > 1 &&
+              typeof event.target.loadPlaylist === "function"
+            ) {
+              event.target.loadPlaylist(playlistIds, 0, 0);
+            } else {
+              event.target.loadVideoById?.({ videoId, startSeconds: 0 });
+            }
+          } catch { }
+        },
+
+        onStateChange: event => {
+          if (!window.YT || standbyToken !== youtubeStandbyMountToken) return;
+
+          if (youtubeStandbyPriming && event.data === window.YT.PlayerState.PLAYING) {
+            youtubeStandbyPriming = false;
+            youtubeStandbyPrimed = true;
+            try {
+              event.target.pauseVideo?.();
+              event.target.seekTo?.(0, true);
+            } catch { }
+            return;
+          }
+
+          if (currentSource !== "youtube" || youtubePlayer !== event.target) return;
+
+          if (event.data === window.YT.PlayerState.PLAYING) {
+            syncYouTubeQueueSong(event.target);
+            return;
+          }
+
+          if (event.data !== window.YT.PlayerState.ENDED) return;
+
+          const activeItem = syncYouTubeQueueSong(event.target);
+          if (youtubeNativeQueueHasNext(event.target)) return;
+
+          if (activeItem || currentSongId === nextSong.id) {
+            setTimeout(() => playNextSong(), 250);
+          }
+        },
+
+        onError: () => {
+          if (currentSource === "youtube" && youtubePlayer === youtubeStandbyPlayer) {
+            playerStatus.textContent = "YOUTUBE · PLAYBACK ERROR";
+          }
+        }
+      }
+    });
+
+    return true;
+  } catch {
+    destroyYouTubeStandby();
+    return false;
+  }
+}
+
+function startYouTubeBackgroundQueueMonitor() {
+  clearInterval(youtubePlaybackMonitor);
+  youtubePlaybackWorker?.terminate?.();
+  youtubePlaybackWorker = null;
+  youtubePlaybackMonitor = null;
+
+  try {
+    youtubePlaybackWorker = new Worker(
+      URL.createObjectURL(
+        new Blob([
+          `setInterval(() => postMessage("tick"), 1000);`
+        ], { type: "application/javascript" })
+      )
+    );
+
+    youtubePlaybackWorker.onmessage = () => {
+      if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+
+      try {
+        const state = youtubePlayer.getPlayerState?.();
+        if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
+          syncYouTubeQueueSong(youtubePlayer);
+          if (!youtubeNativeQueueHasNext(youtubePlayer)) playNextSong();
+        }
+      } catch { }
+    };
+  } catch {
+    youtubePlaybackMonitor = setInterval(() => {
+      if (!youtubePlayer || currentSource !== "youtube" || !autoNextEnabled) return;
+
+      try {
+        const state = youtubePlayer.getPlayerState?.();
+        if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
+          syncYouTubeQueueSong(youtubePlayer);
+          if (!youtubeNativeQueueHasNext(youtubePlayer)) playNextSong();
+        }
+      } catch { }
+    }, 1000);
+  }
+}
+
+function activateSpotifyBackgroundYouTubeStandby() {
+  if (
+    !document.hidden ||
+    !autoNextEnabled ||
+    autoNextTransitionLock ||
+    !youtubeStandbyPlayer ||
+    !youtubeStandbyPrimed ||
+    !youtubeStandbySong
+  ) {
+    return false;
+  }
+
+  const nextSong = youtubeStandbySong;
+  const promotedPlayer = youtubeStandbyPlayer;
+  const promotedQueue = [...youtubeStandbyQueue];
+  const standbyMount = mediaEmbed.querySelector(".youtube-background-standby");
+
+  if (!standbyMount) return false;
 
   autoNextTransitionLock = true;
-  playSong(currentSong, "youtube", {
-    backgroundFallback: true,
-    startSeconds
-  });
+  backgroundYoutubeFallbackActive = true;
+  currentSongId = nextSong.id;
+  currentSource = "youtube";
+
+  youtubePlayer = promotedPlayer;
+  youtubeAutoQueue = promotedQueue;
+  youtubeNativeQueueActive = promotedQueue.length > 1;
+
+  youtubeStandbyPlayer = null;
+  youtubeStandbySong = null;
+  youtubeStandbyQueue = [];
+  youtubeStandbyPrimed = false;
+  youtubeStandbyPriming = false;
+
+  destroySpotifyPlayer({ preserveMode: true });
+  mediaEmbed.querySelector(".spotify-player-mount")?.remove();
+
+  standbyMount.classList.remove("youtube-background-standby");
+  standbyMount.classList.add("youtube-player-mount");
+  standbyMount.removeAttribute("aria-hidden");
+  mediaEmbed.className = "media-embed youtube-mode";
+
+  setScriptAwareText(playerTitle, nextSong.title);
+  setScriptAwareText(playerArtist, nextSong.artist);
+  playerStatus.textContent = "BACKGROUND · YOUTUBE";
+  renderSourceTabs(nextSong, "youtube");
+  void markSongRead(nextSong);
+  syncPlayButtons();
+  syncStatsPlayingState();
+
+  startYouTubeBackgroundQueueMonitor();
+
+  try {
+    promotedPlayer.unMute?.();
+    promotedPlayer.setVolume?.(100);
+    promotedPlayer.seekTo?.(0, true);
+    promotedPlayer.playVideo?.();
+  } catch { }
 
   window.setTimeout(() => {
     autoNextTransitionLock = false;
-  }, 650);
+  }, 500);
 
   return true;
+}
+
+function finishSpotifyHiddenFallback(attempt = 0) {
+  if (!document.hidden) {
+    playNextSpotifySong();
+    return;
+  }
+
+  if (activateSpotifyBackgroundYouTubeStandby()) return;
+
+  if (attempt < 12) {
+    void prepareSpotifyBackgroundYouTubeStandby();
+    window.setTimeout(() => finishSpotifyHiddenFallback(attempt + 1), 140);
+    return;
+  }
+
+  handoffSpotifyBackgroundToYouTube();
 }
 
 function handoffSpotifyBackgroundToYouTube(targetSong = null) {
@@ -2522,8 +2761,14 @@ function playNextSpotifySong() {
     return;
   }
 
-  // Hidden tabs continue the archive on YouTube because Spotify iframe autoplay is unreliable there.
-  if (document.hidden && handoffSpotifyBackgroundToYouTube()) return;
+  // Let the current Spotify song finish. If the tab is still hidden at its
+  // natural end, promote the pre-initialized YouTube standby for the next song.
+  if (document.hidden) {
+    if (activateSpotifyBackgroundYouTubeStandby()) return;
+    void prepareSpotifyBackgroundYouTubeStandby();
+    window.setTimeout(() => finishSpotifyHiddenFallback(0), 120);
+    return;
+  }
 
   const nextSong = nextSpotifySong(currentSongId);
 
@@ -2728,6 +2973,9 @@ async function mountSpotifyPlayer(song) {
           spotifyAutoStartAttempts = 0;
           startSpotifyAutoNextWatchdog();
           syncSpotifyAutoNextDeadline();
+          if (spotifyPlaybackMode === "full") {
+            void prepareSpotifyBackgroundYouTubeStandby();
+          }
 
           if (spotifyAutoplayTimer) {
             clearTimeout(spotifyAutoplayTimer);
@@ -2841,6 +3089,7 @@ async function mountSpotifyPlayer(song) {
               syncSpotifyPlaybackStatus(
                 songs.find(item => String(item.id) === String(currentSongId)) || song
               );
+              void prepareSpotifyBackgroundYouTubeStandby();
             }
           }
 
@@ -4728,8 +4977,8 @@ function playSong(song, requestedSource = null, options = {}) {
     mediaEmbed.className = "media-embed spotify-mode";
     mediaEmbed.innerHTML = "";
 
-    // Warm the YouTube API while Spotify is in the foreground so a later
-    // background handoff does not have to wait for the API script to load.
+    // Preload the YouTube API while Spotify is active. Once full playback is
+    // confirmed, the next YouTube track is primed silently as a standby.
     if (youtubeId) {
       void ensureYouTubeApi().catch(() => {});
     }
