@@ -95,7 +95,14 @@ const PIXEL_ROWS = 20;
 const PIXEL_CELL_SIZE = 8;
 const PIXEL_SYNC_DELAY_MS = 120;
 const PIXEL_SYNC_RETRY_MS = 800;
-const pixelState = Array.from({ length: PIXEL_COLS * PIXEL_ROWS }, () => ({ filled: false, color: "#E7FE00" }));
+const PIXEL_DEFAULT_COLORS = [
+  "#FFD60A",
+  "#FF3B30",
+  "#0066FF"
+];
+const PIXEL_RECENT_COLORS_STORAGE_PREFIX = "listening-archive-pixel-recent-colors-v2";
+const PIXEL_RECENT_COLORS_LIMIT = 4;
+const pixelState = Array.from({ length: PIXEL_COLS * PIXEL_ROWS }, () => ({ filled: false, color: "#FFD60A" }));
 const pendingPixelWrites = new Map();
 
 let pixelBoardReady = false;
@@ -103,12 +110,13 @@ let pixelFlushTimer = null;
 let pixelFlushInFlight = false;
 let pixelDrawing = false;
 let pixelActiveTool = "brush";
-let pixelActiveColor = "#E7FE00";
+let pixelActiveColor = "#FFD60A";
 let pixelLastPaintKey = null;
 let pixelLastPaintPoint = null;
 let pixelRenderQueued = false;
 let pixelTouchDrawingArmed = false;
 let pixelTouchArmTimer = null;
+let pixelRecentColors = [];
 
 const PIXEL_TOUCH_ARM_TIMEOUT_MS = 7000;
 
@@ -119,8 +127,7 @@ let currentSource = null;
 
 const AUTO_NEXT_STORAGE = "songs-we-sent-auto-next-v1";
 
-// Auto Next always starts enabled on every fresh page load.
-// The control can still be toggled OFF for the current page session.
+// Auto Next resets to enabled on each page load.
 let autoNextEnabled = true;
 try {
   localStorage.setItem(AUTO_NEXT_STORAGE, "true");
@@ -275,7 +282,7 @@ function renderPixelBoard() {
       if (!pixel?.filled) continue;
 
       pixelContext.fillStyle =
-        pixel?.color || "#E7FE00";
+        pixel?.color || "#FFD60A";
 
       pixelContext.fillRect(
         x * PIXEL_CELL_SIZE,
@@ -369,7 +376,7 @@ function queuePixelWrite(x, y, filled, color) {
     x,
     y,
     filled: Boolean(filled),
-    color: color || "#E7FE00"
+    color: color || "#FFD60A"
   });
 
   setPixelBoardStatus("SYNCING…", "syncing");
@@ -392,7 +399,7 @@ async function flushPixelWrites() {
     x: pixel.x,
     y: pixel.y,
     filled: pixel.filled,
-    color: pixel.color || "#E7FE00",
+    color: pixel.color || "#FFD60A",
     updated_by: currentUser.id,
     updated_at: new Date().toISOString()
   }));
@@ -422,7 +429,7 @@ async function flushPixelWrites() {
           x: pixel.x,
           y: pixel.y,
           filled: pixel.filled,
-          color: pixel.color || "#E7FE00"
+          color: pixel.color || "#FFD60A"
         });
       }
     }
@@ -551,27 +558,95 @@ function setPixelTool(tool) {
   pixelLastPaintPoint = null;
 }
 
-function setPixelColor(color) {
-  pixelActiveColor = String(color || "#E7FE00").toUpperCase();
+function normalizePixelColor(color) {
+  const normalized = String(color || "").trim().toUpperCase();
+  return /^#[0-9A-F]{6}$/.test(normalized) ? normalized : "#FFD60A";
+}
 
+function pixelRecentColorsStorageKey() {
+  const person = currentPerson === "owner" || currentPerson === "friend"
+    ? currentPerson
+    : "device";
+  return `${PIXEL_RECENT_COLORS_STORAGE_PREFIX}:${person}`;
+}
+
+function loadPixelRecentColors() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(pixelRecentColorsStorageKey()) || "[]");
+    if (!Array.isArray(stored)) return [];
+
+    const unique = [];
+    for (const color of stored) {
+      const normalized = normalizePixelColor(color);
+      if (PIXEL_DEFAULT_COLORS.includes(normalized) || unique.includes(normalized)) continue;
+      unique.push(normalized);
+      if (unique.length >= PIXEL_RECENT_COLORS_LIMIT) break;
+    }
+    return unique;
+  } catch {
+    return [];
+  }
+}
+
+function savePixelRecentColors() {
+  try {
+    localStorage.setItem(pixelRecentColorsStorageKey(), JSON.stringify(pixelRecentColors));
+  } catch { }
+}
+
+function syncPixelSwatchSelection() {
   pixelSwatches
     .querySelectorAll(".pixel-swatch")
     .forEach(button => {
       const active =
-        String(button.dataset.color || "").toUpperCase() ===
+        normalizePixelColor(button.dataset.color) ===
         pixelActiveColor;
 
       button.classList.toggle("is-active", active);
-      button.setAttribute(
-        "aria-pressed",
-        active ? "true" : "false"
-      );
+      button.setAttribute("aria-pressed", active ? "true" : "false");
     });
+}
 
+function renderPixelRecentColors() {
+  pixelSwatches
+    .querySelectorAll(".pixel-swatch-recent")
+    .forEach(button => button.remove());
+
+  pixelRecentColors.forEach((color, index) => {
+    const button = document.createElement("button");
+    button.className = "pixel-swatch pixel-swatch-recent";
+    button.type = "button";
+    button.dataset.color = color;
+    button.setAttribute("aria-label", `Recent color ${index + 1}: ${color}`);
+    button.setAttribute("aria-pressed", "false");
+    button.style.setProperty("--swatch", color);
+    button.disabled = !pixelBoardReady;
+    pixelSwatches.append(button);
+  });
+
+  syncPixelSwatchSelection();
+}
+
+function rememberPixelColorUsage(color) {
+  const normalized = normalizePixelColor(color);
+  if (PIXEL_DEFAULT_COLORS.includes(normalized)) return;
+  if (pixelRecentColors[0] === normalized) return;
+
+  pixelRecentColors = [
+    normalized,
+    ...pixelRecentColors.filter(existing => existing !== normalized)
+  ].slice(0, PIXEL_RECENT_COLORS_LIMIT);
+
+  savePixelRecentColors();
+  renderPixelRecentColors();
+}
+
+function setPixelColor(color) {
+  pixelActiveColor = normalizePixelColor(color);
+  syncPixelSwatchSelection();
   pixelCustomColor.value = pixelActiveColor;
   setPixelTool("brush");
 }
-
 
 
 function pixelsMatchForFill(a, b) {
@@ -587,8 +662,8 @@ function pixelsMatchForFill(a, b) {
   }
 
   return (
-    String(a?.color || "#E7FE00").toUpperCase() ===
-    String(b?.color || "#E7FE00").toUpperCase()
+    String(a?.color || "#FFD60A").toUpperCase() ===
+    String(b?.color || "#FFD60A").toUpperCase()
   );
 }
 
@@ -670,6 +745,7 @@ function floodFillPixels(startX, startY) {
     return;
   }
 
+  rememberPixelColorUsage(pixelActiveColor);
   schedulePixelRender();
 
   for (const pixel of changed) {
@@ -715,6 +791,10 @@ function paintPixel(x, y) {
     filled: nextFilled,
     color: nextColor
   };
+
+  if (nextFilled) {
+    rememberPixelColorUsage(nextColor);
+  }
 
   schedulePixelRender();
 
@@ -784,12 +864,12 @@ function applyPixelRealtime(payload) {
   const index = pixelIndex(row.x, row.y);
   const localPixel = pixelState[index];
   const incomingFilled = Boolean(row.filled);
-  const incomingColor = row.color || "#E7FE00";
+  const incomingColor = row.color || "#FFD60A";
 
   if (
     row.updated_by === currentUser?.id &&
     Boolean(localPixel?.filled) === incomingFilled &&
-    String(localPixel?.color || "#E7FE00").toUpperCase() ===
+    String(localPixel?.color || "#FFD60A").toUpperCase() ===
       String(incomingColor).toUpperCase()
   ) {
     return;
@@ -834,7 +914,7 @@ async function loadPixelBoard() {
   }
 
   for (let i = 0; i < pixelState.length; i += 1) {
-    pixelState[i] = { filled: false, color: "#E7FE00" };
+    pixelState[i] = { filled: false, color: "#FFD60A" };
   }
 
   for (const row of data || []) {
@@ -848,7 +928,7 @@ async function loadPixelBoard() {
     ) {
       pixelState[pixelIndex(row.x, row.y)] = {
         filled: Boolean(row.filled),
-        color: row.color || "#E7FE00"
+        color: row.color || "#FFD60A"
       };
     }
   }
@@ -876,8 +956,6 @@ async function loadPixelBoard() {
 }
 
 
-
-
 pixelBrushTool.addEventListener("click", () => {
   setPixelTool("brush");
   armPixelTouchDrawing();
@@ -894,18 +972,16 @@ pixelEraserTool.addEventListener("click", () => {
 });
 
 
-
 pixelSwatches.addEventListener("click", event => {
   const button = event.target.closest(".pixel-swatch");
 
   if (!button || button.disabled) return;
 
   setPixelColor(
-    button.dataset.color || "#E7FE00"
+    button.dataset.color || "#FFD60A"
   );
   armPixelTouchDrawing();
 });
-
 
 
 pixelCustomColor.addEventListener("input", event => {
@@ -913,8 +989,9 @@ pixelCustomColor.addEventListener("input", event => {
   armPixelTouchDrawing();
 });
 
+renderPixelRecentColors();
 setPixelTool("brush");
-setPixelColor("#E7FE00");
+setPixelColor("#FFD60A");
 
 
 pixelBoardStage.addEventListener("pointerdown", event => {
@@ -1069,7 +1146,7 @@ pixelBoardClear.addEventListener(
         filled: false,
         color:
           pixelState[i]?.color ||
-          "#E7FE00"
+          "#FFD60A"
       };
     }
 
@@ -1217,11 +1294,7 @@ function removeNewMarkerFromSongDom(songId) {
   const id = String(songId);
   document.querySelectorAll(".song-row").forEach(row => {
     if (String(row.dataset.id || "") !== id) return;
-    // Keep the NEW-slot layout class for this rendered row after it is read.
-    // Removing it immediately used to switch .song-title-text from flex to block
-    // on the same tap that started playback, which could cause a tiny mobile
-    // reflow. The marker is hidden, but its layout footprint stays stable until
-    // the next normal render.
+    // Preserve the marker slot until the next render to avoid mobile reflow.
     row.classList.add("is-new-read");
     row.querySelectorAll(".latest-song-marker").forEach(marker => {
       marker.classList.add("is-read-placeholder");
@@ -1486,6 +1559,8 @@ function setupRealtime() {
 async function unlockArchive(person, people) {
   currentPerson = person;
   setArchivePeople(people);
+  pixelRecentColors = loadPixelRecentColors();
+  renderPixelRecentColors();
 
   if (!ownerName() || !friendName()) {
     throw new Error("ARCHIVE DISPLAY NAMES ARE MISSING");
@@ -1582,10 +1657,7 @@ document.addEventListener("visibilitychange", () => {
 
   if (!currentPerson) return;
 
-  // Returning to the tab used to rebuild the entire archive every time. When
-  // WALL was active that also cleared/recreated every album image, producing
-  // a visible flash even when Supabase data had not changed. Compare the read
-  // state + song dataset first and only render when something is genuinely new.
+  // Re-render only when read state or song data changes.
   const previousReadState = songReadStateSignature();
 
   loadSongReadState()
@@ -1852,8 +1924,7 @@ function playNextSong() {
   if (preferredSource === "youtube") {
     const nextVideoId = getYouTubeVideoId(nextSong.youtubeUrl);
 
-    // Keep the existing YouTube player session during auto-next.
-    // Recreating the iframe can trigger background autoplay restrictions.
+    // Reuse the player to preserve background autoplay.
     if (
       youtubePlayer &&
       nextVideoId &&
@@ -1883,8 +1954,7 @@ function playNextSong() {
   }
 
   if (preferredSource) {
-    // playSong() is synchronous; release the guard shortly after switching
-    // tracks so duplicate ENDED events cannot immediately skip another song.
+    // Briefly debounce duplicate ENDED events.
     playSong(nextSong, preferredSource);
     setTimeout(() => {
       autoNextTransitionLock = false;
@@ -1956,9 +2026,7 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
           clearInterval(youtubePlaybackMonitor);
           youtubePlaybackWorker?.terminate?.();
 
-          // Use a worker clock so background tabs are less affected by normal
-          // window timer throttling. The worker only signals a check; the
-          // YouTube API call still runs on the main thread.
+          // Use a worker tick to reduce background-tab timer throttling.
           try {
             youtubePlaybackWorker = new Worker(
               URL.createObjectURL(
@@ -2004,9 +2072,7 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
 
           if (event.data !== window.YT.PlayerState.ENDED) return;
 
-          // Always handle next track ourselves instead of relying on
-          // YouTube playlist state. This keeps newly added songs available
-          // and prevents failures when the browser tab is backgrounded.
+          // Drive queue changes locally so newly added songs remain available.
           const activeItem = syncYouTubeQueueSong(event.target);
 
           if (activeItem || currentSongId === song.id) {
@@ -2118,9 +2184,7 @@ async function resolveAlbumMetadataViaSupabase(songList, { force = false, limit 
 
   let resolvedAny = false;
 
-  // The deployed resolver accepts one song_id per invocation. Run a few in
-  // parallel so existing libraries backfill gradually without hammering the
-  // Edge Function or Apple/Bandcamp endpoints.
+  // Limit concurrent resolver calls to protect external endpoints.
   const concurrency = 3;
   for (let start = 0; start < candidates.length; start += concurrency) {
     const batch = candidates.slice(start, start + concurrency);
@@ -2173,10 +2237,7 @@ function ensureWallAlbumMetadata(songList) {
   const missing = (songList || []).filter(song => !hasStoredAlbumMetadata(song) || needsKnownAlbumCorrection(song));
   if (!missing.length || albumMetadataFunctionUnavailable) return;
 
-  // WALL must never wait for remote album lookup. Resolve missing/corrected rows
-  // quietly in the background. Do not rebuild the active wall when metadata
-  // finishes, because a grouping-key change would make neighboring album blocks
-  // jump. The corrected metadata appears the next time WALL is opened.
+  // Backfill album metadata asynchronously without reshuffling the active wall.
   if (!albumMetadataBackfillPromise) {
     albumMetadataBackfillPromise = resolveAlbumMetadataViaSupabase(missing)
       .finally(() => { albumMetadataBackfillPromise = null; });
@@ -2205,9 +2266,7 @@ function artworkPlaceholder(song) {
 
 function youtubeArtwork(song) {
   const id = getYouTubeVideoId(song.youtubeUrl);
-  // mqdefault is a native 16:9 YouTube thumbnail. Unlike hqdefault (4:3), it
-  // avoids the common baked-in black letterbox bars when object-fit crops the
-  // artwork into the square WALL cell.
+  // mqdefault is 16:9 and crops cleanly into square wall cells.
   return id ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg` : "";
 }
 
@@ -2266,9 +2325,7 @@ async function bandcampArtworkFromPage(pageUrl) {
     } catch { }
   }
 
-  // Stable fallback for the same album if Bandcamp blocks cross-origin oEmbed
-  // in a particular browser session. This keeps the wall from reverting to the
-  // older incorrect Mogwai cover.
+  // Stable fallback when Bandcamp oEmbed is blocked by CORS.
   try {
     const response = await fetchWithPrototypeTimeout(
       `https://open.spotify.com/oembed?url=${encodeURIComponent(MOGWAI_HAPPY_SONGS_SPOTIFY_URL)}`,
@@ -2354,7 +2411,7 @@ function getPrototypeAlbumOverride(song) {
     };
   }
 
-  // Resolve the known Mogwai metadata mismatch from its canonical album source.
+  // Resolve known Mogwai metadata from its canonical source.
   if (suppliedAlbumName === normalizeArtworkText("Mogwai") ||
       suppliedAlbumName === normalizeArtworkText("Happy Songs for Happy People") ||
       title === normalizeArtworkText("Mogwai")) {
@@ -2399,17 +2456,14 @@ async function resolvePrototypeAlbum(song) {
 
   let albumKey = "";
   if (apple?.releaseType === "single") {
-    // Singles are represented by the recommended song itself rather than a
-    // release container, which also prevents unrelated single releases from
-    // being grouped together by a shared metadata quirk.
+    // Keep singles grouped by song rather than release metadata.
     albumKey = `single:${String(song.id)}`;
   } else if (apple?.albumId) {
     albumKey = `apple:${apple.albumId}`;
   } else if (spotifyUrl) {
     albumKey = `art:${stableArtworkIdentity(spotifyUrl)}`;
   } else {
-    // If album identity cannot be established safely, keep the recommendation
-    // separate rather than accidentally combining unrelated songs.
+    // Keep unresolved releases separate to avoid false album grouping.
     albumKey = `song:${String(song.id)}`;
   }
 
@@ -2422,7 +2476,7 @@ async function resolvePrototypeAlbum(song) {
     releaseType: apple?.releaseType || "album"
   };
 
-  // Album-level override pass after external metadata resolution.
+  // Apply album-level overrides after external metadata resolution.
   const normalizedAlbumName = normalizeArtworkText(result?.albumName || "");
   if (normalizedAlbumName === normalizeArtworkText("Mogwai") ||
       normalizedAlbumName === normalizeArtworkText("Happy Songs for Happy People")) {
@@ -2475,8 +2529,7 @@ function makeAlbumGroups(resolvedSongs) {
     if (!group.albumName && album.albumName) group.albumName = album.albumName;
   });
 
-  // getVisibleSongs() is newest-first, so Map insertion order naturally keeps
-  // albums ordered by their most recent recommendation.
+  // Preserve newest-first album order.
   return Array.from(groups.values());
 }
 
@@ -2527,8 +2580,7 @@ function renderTrueWallHalftone(source, canvas) {
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) return false;
 
-  // Downsample to one luminance sample per dot cell. Smaller cells + a larger
-  // output canvas preserve more detail while still reading as halftone.
+  // Downsample to one luminance sample per halftone cell.
   const sample = document.createElement("canvas");
   sample.width = cols;
   sample.height = rows;
@@ -2556,15 +2608,12 @@ function renderTrueWallHalftone(source, canvas) {
       const alpha = pixels[i + 3] / 255;
       const luminance = ((pixels[i] * 0.2126) + (pixels[i + 1] * 0.7152) + (pixels[i + 2] * 0.0722)) / 255;
 
-      // Balanced tone mapping: preserve midtone detail, deepen shadows slightly,
-      // and keep highlights clearer. This gives more perceived contrast without
-      // crushing detail the way a hard threshold would.
+      // Preserve midtones while slightly deepening shadows and highlights.
       let tone = Math.max(0, Math.min(1, luminance * alpha));
       tone = Math.max(0, Math.min(1, (tone - 0.045) / 0.91));
       tone = Math.pow(tone, 0.95);
 
-      // Smaller dots overall so the image keeps more detail, while still letting
-      // bright areas grow close to the cell size.
+      // Keep dots small enough to preserve image detail.
       const radius = 0.12 + tone * 2.02;
       if (radius <= 0.16) continue;
 
@@ -2664,9 +2713,7 @@ function makeAlbumInfoCell(group) {
   const tracks = document.createElement("div");
   tracks.className = "album-editorial-tracks";
 
-  // Wall captions intentionally contain only album name, the recommended
-  // song name(s), and artist name. Show every recommended track from this
-  // album so no requester/date/count metadata is needed.
+  // Wall captions contain album, recommended tracks, and artist only.
   group.songs.forEach(song => {
     const button = document.createElement("button");
     button.type = "button";
@@ -2699,10 +2746,7 @@ function wallLayoutHash(value) {
 }
 
 function appendAlbumCollage(groups) {
-  // Build a broad set of paired editorial row patterns. Each album remains a
-  // two-cell cover + caption pair, but every grid column can host cover art,
-  // copy, yellow, or breathing space. This prevents one cover column from
-  // becoming visually dominant across a long wall.
+  // Balance cover, caption, yellow, and blank cells across columns.
   const dominoSlots = [[0, 1], [2, 3], [4, 5]];
   const templates = [];
 
@@ -2791,26 +2835,24 @@ function appendAlbumCollage(groups) {
       const repeatedBlankCount = blankColumns.filter(col => previousBlankColumns.includes(col)).length;
       let score = 0;
 
-      // Highest priority: cover art should stay evenly distributed. A template
-      // that makes the busiest cover column even busier is heavily penalized.
+      // Prioritize even cover distribution.
       score += (nextMaxCover - nextMinCover) * 2500;
       score += coverVariance * 220;
       score += repeatedCoverCount * 420;
       if (coverColumns.join(",") === previousCoverColumns.join(",")) score += 1800;
 
-      // Spread decorative breathing space too, avoiding a visibly empty column.
+      // Spread blank cells across columns.
       score += blankColumns.reduce((sum, col) => sum + blankColumnCounts[col], 0) * 80;
       score += repeatedBlankCount * 110;
       if (blankColumns.join(",") === previousBlankColumns.join(",")) score += 550;
 
       if (useYellowThisRow) {
-        // Every column should receive its first yellow before any column gets a
-        // second whenever the available rows permit it.
+        // Give each column one yellow cell before assigning a second.
         score += (solidColumnCounts[solidColumn] - minSolidCount) * 5000;
         if (previousSolidColumn === solidColumn) score += 900;
       }
 
-      score += offset * 0.001; // deterministic tie break
+      score += offset * 0.001;
       if (score < bestScore) {
         bestScore = score;
         bestTemplateIndex = templateIndex;
@@ -2827,8 +2869,7 @@ function appendAlbumCollage(groups) {
     if (canUseSolid) solidColumnCounts[chosenSolidColumn] += 1;
     chosenCoverColumns.forEach(col => { coverColumnCounts[col] += 1; });
     chosenBlankColumns.forEach(col => {
-      // On non-yellow rows the nominal solid cell becomes a second blank, so
-      // account for it as breathing space when balancing future rows.
+      // Count the unused solid cell as blank space on non-yellow rows.
       blankColumnCounts[col] += 1;
     });
     if (!canUseSolid && chosenSolidColumn >= 0) blankColumnCounts[chosenSolidColumn] += 1;
@@ -2888,9 +2929,7 @@ async function renderWall() {
     return;
   }
 
-  // Render immediately from Supabase metadata already present in the songs
-  // query. Missing rows get a lightweight placeholder and are resolved in the
-  // background, so opening WALL never waits on Bandcamp/Apple network calls.
+  // Render stored metadata immediately and resolve missing data in background.
   const resolved = wallSongs.map(song => ({
     song,
     album: hasStoredAlbumMetadata(song)
@@ -2905,9 +2944,21 @@ async function renderWall() {
   if (wallAlbumCount) wallAlbumCount.textContent = `${groups.length} ALBUM${groups.length === 1 ? "" : "S"}`;
   appendAlbumCollage(groups);
 
-  // Fire-and-forget background backfill. This is intentionally after the DOM
-  // render so it cannot delay first paint.
+  // Start metadata backfill after first paint.
   ensureWallAlbumMetadata(wallSongs);
+}
+
+function scrollViewBelowToolbar(section) {
+  requestAnimationFrame(() => {
+    const toolbar = document.querySelector(".toolbar");
+    const toolbarHeight = toolbar ? toolbar.getBoundingClientRect().height : 0;
+    const top = section.getBoundingClientRect().top + window.scrollY - toolbarHeight;
+    window.scrollTo({
+      top: Math.max(0, top),
+      left: 0,
+      behavior: "smooth"
+    });
+  });
 }
 
 function setView(view) {
@@ -2943,13 +2994,11 @@ function setView(view) {
       statsView.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   } else if (isWall) {
-    // Opening WALL is the deliberate refresh boundary: use the latest Supabase
-    // metadata, then keep that arrangement stable for the duration of the view.
     wallRenderedSongSignature = "";
     renderWall();
-    requestAnimationFrame(() => {
-      wallView.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    scrollViewBelowToolbar(wallView);
+  } else if (window.matchMedia("(min-width: 621px)").matches) {
+    scrollViewBelowToolbar(archiveView);
   }
 }
 
@@ -3043,8 +3092,7 @@ form.addEventListener("submit", async event => {
     if (inserted) {
       const newSong = mapRemoteSong(inserted);
       songs.unshift(newSong);
-      // Persist canonical album metadata on the songs row through the deployed
-      // Supabase resolver (Bandcamp when supplied, then Apple/iTunes fallback).
+      // Persist canonical album metadata through the Supabase resolver.
       await resolveAlbumMetadataViaSupabase([newSong], { limit: 1 });
       renderSongs();
     } else {
@@ -3434,9 +3482,7 @@ function stabilizeMobileArchiveHorizontalPosition() {
   setTimeout(reset, 240);
 }
 
-// Mobile browsers can synthesize hover/focus and show a text-selection
-// magnifier/callout during a long press. Keep those browser-native effects
-// from changing the perceived title size while preserving normal tap/scroll.
+// Prevent native long-press effects from changing mobile title geometry.
 ["contextmenu", "selectstart", "dragstart"].forEach(type => {
   songList?.addEventListener(type, event => {
     if (!mobileSongLayoutQuery.matches) return;
@@ -3451,13 +3497,12 @@ function stabilizeMobileArchiveHorizontalPosition() {
     const row = event.target.closest(".song-row");
     row?.querySelector(".song-title")?.blur?.();
 
-    // Horizontal movement is never part of the archive interaction.
+    // Keep the mobile archive horizontally anchored.
     stabilizeMobileArchiveHorizontalPosition();
   }, { passive: true });
 });
 
-/* Do not let a touch hold leave a native button focus state behind. The
-   click still fires normally; this only removes browser focus styling. */
+// Remove touch focus styling without blocking click behavior.
 songList?.addEventListener("pointerdown", event => {
   if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
   const control = event.target.closest('.song-row button, .song-row [role="button"]');
@@ -3480,10 +3525,7 @@ function updateMobileSongWrapState(row) {
   const titleSpan = titleText?.querySelector(":scope > span:first-child");
   if (!titleText || !titleSpan) return;
 
-  // A DOM Range returns one client rect per rendered text line. This is more
-  // reliable than comparing total element height and also gives us the exact
-  // first-line width needed to place the NEW marker immediately after the
-  // visible text instead of after the full wrapping frame.
+  // Use line rects to measure wrapping and position the NEW marker.
   const range = document.createRange();
   range.selectNodeContents(titleSpan);
   const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
@@ -3557,25 +3599,16 @@ function renderSongs() {
     let mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
 
     if (mobileSongLayoutQuery.matches) {
-      // Touch controls remain clickable but do not enter the browser's focus
-      // navigation path, preventing focus-driven viewport nudges on mobile.
+      // Keep mobile controls out of focus navigation.
       if (playButton) playButton.tabIndex = -1;
       if (mobileDetailsToggle) mobileDetailsToggle.tabIndex = -1;
     }
 
-    // On touch/mobile, avoid native <button> pressed/focus rendering entirely.
-    // Some mobile browsers synthesize :hover/:active while a finger is held or
-    // dragged, which can visually resize/reposition button text even when the
-    // declared font-size is unchanged. A neutral role=button element keeps the
-    // same tap-to-play behavior without the browser-native press treatment.
+    // Use a neutral role=button control to avoid synthetic mobile button states.
     if (mobileSongLayoutQuery.matches && titleButton?.tagName === "BUTTON") {
       const mobileTitle = document.createElement("div");
       mobileTitle.className = titleButton.className;
       mobileTitle.setAttribute("role", "button");
-      // Keep it clickable but out of the mobile focus navigation path.
-      // Some mobile browsers horizontally nudge the viewport to reveal a
-      // focusable element during a tap/drag, which made the song block appear
-      // to shift a few pixels.
       mobileTitle.setAttribute("tabindex", "-1");
       mobileTitle.setAttribute("aria-label", "Play song");
       while (titleButton.firstChild) mobileTitle.appendChild(titleButton.firstChild);
@@ -3583,10 +3616,7 @@ function renderSongs() {
       titleButton = mobileTitle;
     }
 
-    // NOTE uses the same neutral touch-control strategy as the mobile title.
-    // A native button can still receive synthesized :active/:focus geometry on
-    // iOS/Android even with tabindex=-1, which was the last source of the row
-    // visibly nudging when NOTE was opened.
+    // Apply the same neutral control treatment to NOTE.
     if (mobileSongLayoutQuery.matches && mobileDetailsToggle?.tagName === "BUTTON") {
       const mobileNoteToggle = document.createElement("div");
       mobileNoteToggle.className = mobileDetailsToggle.className;
@@ -3630,9 +3660,7 @@ function renderSongs() {
       });
     }
 
-    // Desktop: treat the entire song card as the playback hit area, including
-    // metadata and the expanded note. Existing playback buttons keep their own
-    // handlers, and destructive/detail controls are excluded.
+    // Let the full desktop row start playback, excluding dedicated controls.
     row.addEventListener("click", event => {
       const isDesktopPointer = window.matchMedia(
         "(min-width: 851px) and (hover: hover) and (pointer: fine)"
@@ -3653,10 +3681,7 @@ function renderSongs() {
     mobileDetailsToggle.addEventListener("click", event => {
       event.stopPropagation();
 
-      // Preserve the exact visual anchor of the tapped row. Expanding a block
-      // near a viewport edge can otherwise trigger browser scroll anchoring and
-      // make the title/artist/note group appear to jump even though its CSS did
-      // not move.
+      // Preserve the row viewport position while toggling details.
       const beforeTop = mobileSongLayoutQuery.matches
         ? row.getBoundingClientRect().top
         : null;
@@ -3678,8 +3703,7 @@ function renderSongs() {
       mobileDetailsToggle.textContent = willOpen ? "NOTE −" : "NOTE +";
       event.currentTarget.blur?.();
 
-      // NOTE does not alter the title width, so do not re-measure title wrapping
-      // during this interaction. That removes a second possible geometry change.
+      // NOTE does not change title width, so no wrap re-measure is needed.
       if (beforeTop !== null) {
         requestAnimationFrame(() => {
           const afterTop = row.getBoundingClientRect().top;
@@ -4340,8 +4364,7 @@ function bindTimelineClusterPreview(element, cluster) {
   });
 
   element.addEventListener("click", event => {
-    // Desktop timeline inspection is hover-only. Keep tap behavior available
-    // for coarse/touch pointers if clusters are ever reintroduced there.
+    // Coarse pointers use tap inspection; desktop remains hover-only.
     if (!statsUseTapInteraction()) return;
 
     event.preventDefault();
@@ -4477,8 +4500,7 @@ function buildMobileSequenceTimeline(ordered, viewportWidth) {
 }
 
 function buildTimelineClusters(ordered, start, span, trackWidth) {
-  // Use the same one-song-per-point chronological layout on every viewport.
-  // This keeps desktop recommendations from collapsing into stacked clusters.
+  // Keep one chronological point per song at every viewport size.
   return buildMobileSequenceTimeline(ordered, trackWidth);
 }
 
@@ -4522,7 +4544,7 @@ function bindTimelineTapEffect(dot) {
     if (!statsUseTapInteraction()) return;
     if (event.pointerType === "mouse") return;
 
-    // Only track the gesture here. Holding a circle must have no scale effect.
+    // Track movement only; press-and-hold has no visual state.
     startX = event.clientX;
     startY = event.clientY;
     moved = false;
@@ -4544,7 +4566,7 @@ function bindTimelineTapEffect(dot) {
     if (!statsUseTapInteraction()) return;
     if (event.pointerType === "mouse" || moved) return;
 
-    // A completed tap becomes a persistent mobile hover/selection state.
+    // Persist the mobile selection after a completed tap.
     document.querySelectorAll(".timeline-dot.is-selected").forEach(otherDot => {
       if (otherDot !== dot) otherDot.classList.remove("is-selected");
     });
@@ -4891,8 +4913,7 @@ function bindTooltip(element, allowHtml = false) {
       statsTooltip.dataset.triggerId === triggerId;
 
     if (sameTrigger) {
-      // Timeline dots behave like a persistent hover state on touch: tapping
-      // the selected circle again keeps both the circle and popup open.
+      // Re-tapping a selected timeline dot keeps its tooltip open.
       if (element.classList.contains("timeline-dot") && element.classList.contains("is-selected")) {
         showStatsTooltip(event, content);
         statsTooltip.dataset.triggerId = triggerId;
@@ -4916,8 +4937,7 @@ document.addEventListener("click", event => {
   if (!statsUseTapInteraction()) return;
   if (event.target.closest('[data-stats-tooltip-trigger="true"]')) return;
 
-  // Only a completed tap/click on empty space clears the persistent timeline
-  // selection. Touch-hold and swipe gestures do not dismiss it.
+  // Clear persistent timeline selection only from an empty-space tap.
   document.querySelectorAll(".timeline-dot.is-selected").forEach(dot => {
     dot.classList.remove("is-selected");
   });
