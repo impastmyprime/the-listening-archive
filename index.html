@@ -27,23 +27,25 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="assets/css/styles.css?v=102" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=105" />
 </head>
 
 <body class="access-checking">
   <div class="archive-startup-loader" aria-hidden="true">
-    <div class="archive-loader-visual">
-      <span class="archive-loader-ring archive-loader-ring-a"></span>
-      <span class="archive-loader-ring archive-loader-ring-b"></span>
-      <img class="archive-loader-cat" src="assets/cursors/cat.svg?v=101" alt="" draggable="false" />
+    <div class="archive-loader-block">
+      <div class="archive-loader-visual">
+        <span class="archive-loader-ring archive-loader-ring-a"></span>
+        <span class="archive-loader-ring archive-loader-ring-b"></span>
+        <img class="archive-loader-cat" src="assets/cursors/cat.svg?v=101" alt="" draggable="false" />
+      </div>
+      <div class="archive-loader-eq" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="archive-loader-typewriter" aria-label="Indexing tracks">
+        <span id="archiveLoaderTypedText" data-text="INDEXING TRACKS..."></span><i class="archive-loader-caret" aria-hidden="true"></i>
+      </div>
+      <div class="archive-loader-scan" aria-hidden="true"><b></b></div>
     </div>
-    <div class="archive-loader-eq" aria-hidden="true">
-      <i></i><i></i><i></i><i></i><i></i>
-    </div>
-    <div class="archive-loader-typewriter" aria-label="Indexing tracks">
-      <span id="archiveLoaderTypedText" data-text="INDEXING TRACKS..."></span><i class="archive-loader-caret" aria-hidden="true"></i>
-    </div>
-    <div class="archive-loader-scan" aria-hidden="true"><b></b></div>
   </div>
   <script>
     (() => {
@@ -428,7 +430,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/app.js?v=102"></script>
+  <script src="assets/js/app.js?v=105"></script>
   <script src="assets/js/mobile-title-gap.js?h=908c165869"></script>
 
 </body>
