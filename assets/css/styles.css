@@ -13881,3 +13881,10 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
     transform: none !important;
   }
 }
+
+/* Hide the custom cursor during startup. */
+html.archive-startup-loading .custom-cursor {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
