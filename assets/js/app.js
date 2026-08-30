@@ -2090,7 +2090,6 @@ backToTop.addEventListener("click", () => {
   });
 });
 
-window.addEventListener("resize", syncPlayerTitleWrapState, { passive: true });
 
 function stopYouTubeStandbyKeepAlive() {
   if (youtubeStandbyKeepAliveWorker) {
@@ -2747,7 +2746,6 @@ function activateSpotifyBackgroundYouTubeStandby() {
 
   setScriptAwareText(playerTitle, nextSong.title);
   setScriptAwareText(playerArtist, nextSong.artist);
-  syncPlayerTitleWrapState();
   playerStatus.textContent = "BACKGROUND · YOUTUBE";
   renderSourceTabs(nextSong, "youtube");
   void markSongRead(nextSong);
@@ -2929,7 +2927,6 @@ function playNextSpotifySong() {
 
   setScriptAwareText(playerTitle, nextSong.title);
   setScriptAwareText(playerArtist, nextSong.artist);
-  syncPlayerTitleWrapState();
   renderSourceTabs(nextSong, "spotify");
   playerStatus.textContent = "LOADING NEXT…";
   void markSongRead(nextSong);
@@ -3322,7 +3319,6 @@ function syncYouTubeQueueSong(player = youtubePlayer) {
     currentSource = "youtube";
     setScriptAwareText(playerTitle, song.title);
     setScriptAwareText(playerArtist, song.artist);
-    syncPlayerTitleWrapState();
     playerStatus.textContent = activePlaybackStatusText();
     renderSourceTabs(song, "youtube");
     void markSongRead(song);
@@ -3376,7 +3372,6 @@ function playNextSong() {
       currentSource = "youtube";
       setScriptAwareText(playerTitle, nextSong.title);
       setScriptAwareText(playerArtist, nextSong.artist);
-      syncPlayerTitleWrapState();
       renderSourceTabs(nextSong, "youtube");
       playerStatus.textContent = activePlaybackStatusText();
       void markSongRead(nextSong);
@@ -5316,23 +5311,11 @@ function getSpotifyEmbedUrl(url) {
   }
 }
 
-function syncPlayerTitleWrapState() {
-  if (!playerBar || !playerTitle || playerBar.hidden) return;
-
-  requestAnimationFrame(() => {
-    const style = getComputedStyle(playerTitle);
-    const lineHeight = Number.parseFloat(style.lineHeight) || 0;
-    const wraps = lineHeight > 0 && playerTitle.scrollHeight > lineHeight * 1.45;
-    playerBar.classList.toggle("title-wraps", wraps);
-  });
-}
-
 function revealPlayer(song) {
   currentSongId = song.id;
   setScriptAwareText(playerTitle, song.title);
   setScriptAwareText(playerArtist, song.artist);
   playerBar.hidden = false;
-  syncPlayerTitleWrapState();
   document.body.classList.add("player-open");
   requestAnimationFrame(() => playerBar.classList.add("is-visible"));
   syncPlayButtons();
@@ -5345,7 +5328,6 @@ function closePlayer() {
   setTimeout(() => {
     playerBar.hidden = true;
     mediaEmbed.innerHTML = "";
-    playerBar.classList.remove("title-wraps");
     document.body.classList.remove("player-open");
   }, 220);
   currentSongId = null;
