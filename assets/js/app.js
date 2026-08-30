@@ -159,6 +159,7 @@ let youtubePlaybackMonitor = null;
 let youtubePlaybackWorker = null;
 let autoNextTransitionLock = false;
 let youtubeAutoQueue = [];
+let youtubeNativeQueueActive = false;
 
 let spotifyIframeApiPromise = null;
 let spotifyIframeApi = null;
@@ -1860,13 +1861,13 @@ async function bootstrapSupabase() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") {
     if (currentSource === "spotify" && spotifyPlaybackMode === "full" && spotifyHasStarted) {
+      // Move an active Spotify session to YouTube immediately when the page is
+      // hidden. Waiting until Spotify ends makes the new YouTube autoplay
+      // request arrive too late for reliable background playback.
+      if (handoffActiveSpotifyToYouTube()) return;
+
       startSpotifyAutoNextWatchdog();
       syncSpotifyAutoNextDeadline();
-
-      // Preload YouTube so hidden-tab fallback can start without script-loading delay.
-      if (nextYouTubeSong(currentSongId)) {
-        void ensureYouTubeApi().catch(() => {});
-      }
     }
     return;
   }
@@ -2023,6 +2024,7 @@ backToTop.addEventListener("click", () => {
 function destroyYouTubePlayer() {
   youtubeMountToken++;
   youtubeAutoQueue = [];
+  youtubeNativeQueueActive = false;
 
   if (youtubePlayer && typeof youtubePlayer.destroy === "function") {
     try {
@@ -2370,6 +2372,54 @@ function nextYouTubeSong(currentId) {
   }
 
   return null;
+}
+
+function estimatedSpotifyPositionSeconds() {
+  let position = Math.max(0, Number(spotifyLastPosition || 0));
+
+  if (!spotifyLastPaused && spotifyLastUpdateAt) {
+    position += Math.max(0, Date.now() - spotifyLastUpdateAt);
+  }
+
+  if (spotifyLastDuration > 0) {
+    position = Math.min(position, spotifyLastDuration);
+  }
+
+  return position / 1000;
+}
+
+function handoffActiveSpotifyToYouTube() {
+  if (
+    !document.hidden ||
+    !autoNextEnabled ||
+    currentSource !== "spotify" ||
+    spotifyPlaybackMode !== "full" ||
+    !spotifyHasStarted ||
+    spotifyInterstitialActive ||
+    autoNextTransitionLock
+  ) {
+    return false;
+  }
+
+  const currentSong = songs.find(
+    song => String(song.id) === String(currentSongId)
+  );
+  const videoId = getYouTubeVideoId(currentSong?.youtubeUrl);
+  if (!currentSong || !videoId) return false;
+
+  const startSeconds = estimatedSpotifyPositionSeconds();
+
+  autoNextTransitionLock = true;
+  playSong(currentSong, "youtube", {
+    backgroundFallback: true,
+    startSeconds
+  });
+
+  window.setTimeout(() => {
+    autoNextTransitionLock = false;
+  }, 650);
+
+  return true;
 }
 
 function handoffSpotifyBackgroundToYouTube(targetSong = null) {
@@ -2910,6 +2960,18 @@ function syncYouTubeQueueSong(player = youtubePlayer) {
   return queueItem;
 }
 
+function youtubeNativeQueueHasNext(player = youtubePlayer) {
+  if (!youtubeNativeQueueActive || !player) return false;
+
+  try {
+    const playlist = player.getPlaylist?.() || [];
+    const index = Number(player.getPlaylistIndex?.());
+    return playlist.length > 0 && Number.isFinite(index) && index >= 0 && index < playlist.length - 1;
+  } catch {
+    return false;
+  }
+}
+
 function playNextSong() {
   if (autoNextTransitionLock || !autoNextEnabled || !currentSongId) return;
   autoNextTransitionLock = true;
@@ -3007,7 +3069,7 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
     }
 
     const playerVars = {
-      autoplay: 1,
+      autoplay: 0,
       playsinline: 1,
       rel: 0,
       origin: window.location.origin,
@@ -3033,8 +3095,26 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
           try {
             event.target.unMute?.();
             event.target.setVolume?.(100);
-            event.target.playVideo();
-          } catch { }
+
+            const playlistIds = youtubeAutoQueue
+              .map(item => item.videoId)
+              .filter(Boolean);
+
+            if (autoNextEnabled && playlistIds.length > 1 && typeof event.target.loadPlaylist === "function") {
+              youtubeNativeQueueActive = true;
+              event.target.loadPlaylist(playlistIds, 0, Math.max(0, Number(startSeconds || 0)));
+            } else {
+              youtubeNativeQueueActive = false;
+              event.target.loadVideoById?.({
+                videoId,
+                startSeconds: Math.max(0, Number(startSeconds || 0))
+              });
+            }
+          } catch {
+            try {
+              event.target.playVideo?.();
+            } catch { }
+          }
 
           clearInterval(youtubePlaybackMonitor);
           youtubePlaybackWorker?.terminate?.();
@@ -3056,7 +3136,9 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
                 const state = youtubePlayer.getPlayerState?.();
                 if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
                   syncYouTubeQueueSong(youtubePlayer);
-                  playNextSong();
+                  if (!youtubeNativeQueueHasNext(youtubePlayer)) {
+                    playNextSong();
+                  }
                 }
               } catch { }
             };
@@ -3068,7 +3150,9 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
                 const state = youtubePlayer.getPlayerState?.();
                 if (state === window.YT.PlayerState.ENDED && !autoNextTransitionLock) {
                   syncYouTubeQueueSong(youtubePlayer);
-                  playNextSong();
+                  if (!youtubeNativeQueueHasNext(youtubePlayer)) {
+                    playNextSong();
+                  }
                 }
               } catch { }
             }, 1000);
@@ -3087,6 +3171,8 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
 
           // Drive queue changes locally so newly added songs remain available.
           const activeItem = syncYouTubeQueueSong(event.target);
+
+          if (youtubeNativeQueueHasNext(event.target)) return;
 
           if (activeItem || currentSongId === song.id) {
             setTimeout(() => {
@@ -4634,13 +4720,20 @@ function playSong(song, requestedSource = null, options = {}) {
     }
 
     destroyYouTubePlayer();
-    mountYouTubePlayer(song, youtubeId);
+    mountYouTubePlayer(song, youtubeId, Math.max(0, Number(options?.startSeconds || 0)));
   } else if (source === "spotify" && spotifyEmbedUrl) {
     destroyYouTubePlayer();
     currentSource = "spotify";
     playerStatus.textContent = "LOADING…";
     mediaEmbed.className = "media-embed spotify-mode";
     mediaEmbed.innerHTML = "";
+
+    // Warm the YouTube API while Spotify is in the foreground so a later
+    // background handoff does not have to wait for the API script to load.
+    if (youtubeId) {
+      void ensureYouTubeApi().catch(() => {});
+    }
+
     void mountSpotifyPlayer(song);
   } else {
     destroyYouTubePlayer();
