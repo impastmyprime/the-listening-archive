@@ -4873,6 +4873,16 @@
       font-weight: 600 !important;
     }
 
+    .spotify-auto-status-found {
+      opacity: 1 !important;
+      font-weight: 600 !important;
+    }
+
+    .spotify-auto-status-error {
+      opacity: 1 !important;
+      font-weight: 600 !important;
+    }
+
     
 
     
@@ -13283,5 +13293,21 @@ body.wall-mode #archiveTools #randomSong {
     height: 34px !important;
     min-height: 34px !important;
     margin-block: 0 !important;
+  }
+}
+
+/* Desktop song hover: align the expanded track number to the note's last line. */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  #songList .song-row .expanded-number,
+  #songList .song-row:hover .expanded-number,
+  #songList .song-row:focus-within .expanded-number {
+    align-self: last baseline !important;
+    padding-top: 0 !important;
+  }
+
+  #songList .song-row .expanded-copy,
+  #songList .song-row:hover .expanded-copy,
+  #songList .song-row:focus-within .expanded-copy {
+    align-self: last baseline !important;
   }
 }

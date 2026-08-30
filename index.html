@@ -21,7 +21,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="assets/css/styles.css?h=12a288d428" />
+  <link rel="stylesheet" href="assets/css/styles.css?h=desktop-note-number-baseline" />
 </head>
 
 <body class="access-checking">
@@ -342,8 +342,8 @@
           </label>
           <label>
             <span>SPOTIFY LINK</span>
-            <input name="spotifyUrl" placeholder="https://open.spotify.com/track/…" type="url" />
-            <small class="field-help">OPTIONAL</small>
+            <input name="spotifyUrl" placeholder="Link will be found automatically" type="url" />
+            <small class="field-help" id="spotifyAutoStatus">OPTIONAL · AUTO-FETCH</small>
           </label>
           <div class="identity-field"><span>RECOMMENDED BY</span><strong id="currentSenderIdentity"></strong></div>
           <label class="full"><span>NOTE</span><textarea name="note" placeholder="the bridge at 2:41 got me"
@@ -380,7 +380,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/app.js?h=a81ea80545"></script>
+  <script src="assets/js/app.js?h=spotify-v4-2-metadata-20260830"></script>
   <script src="assets/js/mobile-title-gap.js?h=908c165869"></script>
 
 </body>

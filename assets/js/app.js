@@ -218,6 +218,8 @@ const statsTooltip = document.querySelector("#statsTooltip");
 const submitSongButton = form.querySelector('button[type="submit"]');
 const youtubeUrlInput = form.querySelector('input[name="youtubeUrl"]');
 const youtubeAutoStatus = document.querySelector("#youtubeAutoStatus");
+const spotifyUrlInput = form.querySelector('input[name="spotifyUrl"]');
+const spotifyAutoStatus = document.querySelector("#spotifyAutoStatus");
 
 const accessGate = document.querySelector("#accessGate");
 const appShell = document.querySelector("#appShell");
@@ -247,6 +249,17 @@ youtubeUrlInput.addEventListener("input", () => {
     hasManualUrl
       ? "MANUAL YOUTUBE LINK · AUTO-FETCH WILL BE SKIPPED"
       : "OPTIONAL",
+    hasManualUrl ? "found" : "idle"
+  );
+});
+
+spotifyUrlInput.addEventListener("input", () => {
+  const hasManualUrl = spotifyUrlInput.value.trim().length > 0;
+
+  setSpotifyAutoStatus(
+    hasManualUrl
+      ? "MANUAL SPOTIFY LINK · AUTO-FETCH WILL BE SKIPPED"
+      : "OPTIONAL · AUTO-FETCH",
     hasManualUrl ? "found" : "idle"
   );
 });
@@ -1396,6 +1409,13 @@ function mapRemoteSong(row) {
     artist: String(row.artist || ""),
     youtubeUrl: String(row.youtube_url || ""),
     spotifyUrl: String(row.spotify_url || ""),
+    spotifyStatus: String(row.spotify_status || ""),
+    spotifyLookupSource: String(row.spotify_lookup_source || ""),
+    spotifyLookupAt: row.spotify_lookup_at || null,
+    spotifyTitle: String(row.spotify_title || ""),
+    spotifyArtist: String(row.spotify_artist || ""),
+    spotifyIsrc: String(row.spotify_isrc || ""),
+    spotifyMatchConfidence: row.spotify_match_confidence ?? null,
     note: String(row.note || ""),
     senderPerson,
     createdBy: row.created_by || null,
@@ -1426,6 +1446,13 @@ function songDatasetSignature(list = songs) {
     String(song.artist || ""),
     String(song.youtubeUrl || ""),
     String(song.spotifyUrl || ""),
+    String(song.spotifyStatus || ""),
+    String(song.spotifyLookupSource || ""),
+    String(song.spotifyLookupAt || ""),
+    String(song.spotifyTitle || ""),
+    String(song.spotifyArtist || ""),
+    String(song.spotifyIsrc || ""),
+    String(song.spotifyMatchConfidence ?? ""),
     String(song.note || ""),
     String(song.senderPerson || ""),
     String(song.createdAt || ""),
@@ -1456,7 +1483,7 @@ async function loadRemoteSongs({ quiet = false, forceRender = false } = {}) {
   const { data, error } = await supabaseClient
     .from("songs")
     .select(
-      "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
+      "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
     )
     .order("created_at", { ascending: false });
 
@@ -3025,8 +3052,15 @@ form.addEventListener("submit", async event => {
   const title = String(data.get("title") || "").trim();
   const artist = String(data.get("artist") || "").trim();
   let youtubeUrl = String(data.get("youtubeUrl") || "").trim();
-  const spotifyUrl = String(data.get("spotifyUrl") || "").trim();
+  let spotifyUrl = String(data.get("spotifyUrl") || "").trim();
   const note = String(data.get("note") || "").trim();
+
+  let spotifyStatus = spotifyUrl ? "manual" : "pending";
+  let spotifyLookupSource = spotifyUrl ? "MANUAL" : null;
+  let spotifyTitle = null;
+  let spotifyArtist = null;
+  let spotifyIsrc = null;
+  let spotifyMatchConfidence = null;
 
   if (!title || !artist) return;
 
@@ -3069,6 +3103,79 @@ form.addEventListener("submit", async event => {
       setYouTubeAutoStatus("MANUAL YOUTUBE LINK USED", "found");
     }
 
+    if (!spotifyUrl) {
+      submitSongButton.textContent = "FINDING SPOTIFY…";
+
+      setSpotifyAutoStatus(
+        `SEARCHING SPOTIFY · ${artist.toUpperCase()} — ${title.toUpperCase()}`
+      );
+
+      try {
+        const result = await findSpotifySong(title, artist);
+        const match = result?.match;
+
+        if (match?.url) {
+          spotifyUrl = match.url;
+          spotifyUrlInput.value = spotifyUrl;
+
+          spotifyStatus = "found";
+          spotifyLookupSource =
+            match.source ||
+            result.source ||
+            "AUTO";
+
+          spotifyTitle =
+            match.spotify_title ||
+            match.title ||
+            null;
+
+          spotifyArtist =
+            match.spotify_artist ||
+            match.artist ||
+            null;
+
+          spotifyIsrc = match.isrc || null;
+
+          spotifyMatchConfidence = Number.isFinite(
+            Number(match.confidence)
+          )
+            ? Number(match.confidence)
+            : null;
+
+          setSpotifyAutoStatus(
+            `FOUND · ${String(spotifyLookupSource).replaceAll("_", " ")} · ${String(spotifyTitle || title)}`.toUpperCase(),
+            "found"
+          );
+        } else {
+          spotifyStatus =
+            result?.status === "error"
+              ? "error"
+              : "not_found";
+
+          spotifyLookupSource =
+            result?.source ||
+            "ALL_RESOLVERS_EXHAUSTED";
+
+          setSpotifyAutoStatus(
+            "NO VERIFIED SPOTIFY MATCH FOUND · SONG WILL STILL BE SAVED",
+            "error"
+          );
+        }
+      } catch (error) {
+        console.error("Spotify auto-fetch failed:", error);
+        spotifyStatus = "error";
+        spotifyLookupSource = "FUNCTION_ERROR";
+        setSpotifyAutoStatus(
+          formatSpotifyApiError(error),
+          "error"
+        );
+      }
+    } else {
+      spotifyStatus = "manual";
+      spotifyLookupSource = "MANUAL";
+      setSpotifyAutoStatus("MANUAL SPOTIFY LINK USED", "found");
+    }
+
     submitSongButton.textContent = "SAVING…";
 
     const { data: inserted, error } = await supabaseClient
@@ -3078,12 +3185,19 @@ form.addEventListener("submit", async event => {
         artist,
         youtube_url: youtubeUrl || null,
         spotify_url: spotifyUrl || null,
+        spotify_status: spotifyStatus,
+        spotify_lookup_source: spotifyLookupSource,
+        spotify_lookup_at: new Date().toISOString(),
+        spotify_title: spotifyTitle,
+        spotify_artist: spotifyArtist,
+        spotify_isrc: spotifyIsrc,
+        spotify_match_confidence: spotifyMatchConfidence,
         note: note || null,
         sender_person: currentPerson,
         created_by: currentUser.id
       })
       .select(
-        "id,title,artist,youtube_url,spotify_url,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
+        "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
       )
       .single();
 
@@ -3102,6 +3216,9 @@ form.addEventListener("submit", async event => {
     form.reset();
     setYouTubeAutoStatus(
       "OPTIONAL"
+    );
+    setSpotifyAutoStatus(
+      "OPTIONAL · AUTO-FETCH"
     );
 
     currentFilter = "all";
@@ -3178,6 +3295,129 @@ function setYouTubeAutoStatus(message, state = "idle") {
     "youtube-auto-status-error",
     state === "error"
   );
+}
+
+function setSpotifyAutoStatus(message, state = "idle") {
+  if (!spotifyAutoStatus) return;
+
+  spotifyAutoStatus.textContent = message;
+  spotifyAutoStatus.classList.toggle(
+    "spotify-auto-status-found",
+    state === "found"
+  );
+  spotifyAutoStatus.classList.toggle(
+    "spotify-auto-status-error",
+    state === "error"
+  );
+}
+
+function spotifyTrackUrlOnly(url) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "open.spotify.com") return "";
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const start = parts[0]?.startsWith("intl-") ? 1 : 0;
+    if (parts[start] !== "track" || !parts[start + 1]) return "";
+    return `https://open.spotify.com/track/${parts[start + 1]}`;
+  } catch {
+    return "";
+  }
+}
+
+function normalizeSpotifyMatchText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function findSpotifySong(title, artist) {
+  const wantedTitle = normalizeSpotifyMatchText(title);
+  const wantedArtist = normalizeSpotifyMatchText(artist);
+
+  const archived = songs.find(song =>
+    normalizeSpotifyMatchText(song.title) === wantedTitle &&
+    normalizeSpotifyMatchText(song.artist) === wantedArtist &&
+    spotifyTrackUrlOnly(song.spotifyUrl)
+  );
+
+  if (archived) {
+    return {
+      status: "found",
+      source: "ARCHIVE",
+      match: {
+        url: spotifyTrackUrlOnly(archived.spotifyUrl),
+        spotify_title: archived.spotifyTitle || archived.title,
+        spotify_artist: archived.spotifyArtist || archived.artist,
+        source: "ARCHIVE",
+        isrc: archived.spotifyIsrc || null,
+        confidence: 1
+      }
+    };
+  }
+
+  const { data, error } = await supabaseClient.functions.invoke(
+    "spotify-search",
+    {
+      body: {
+        title,
+        artist
+      }
+    }
+  );
+
+  if (error) {
+    const message = await functionErrorMessage(
+      error,
+      "SPOTIFY SEARCH FAILED"
+    );
+    const wrapped = new Error(message);
+    wrapped.original = error;
+    throw wrapped;
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return {
+    status: String(
+      data?.status ||
+      (data?.match?.url ? "found" : "not_found")
+    ),
+    source: String(
+      data?.match?.source ||
+      data?.source ||
+      ""
+    ),
+    match: data?.match || null
+  };
+}
+
+function formatSpotifyApiError(error) {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (message.includes("404") || message.includes("not found")) {
+    return "SPOTIFY AUTO-FETCH NOT DEPLOYED · SONG CAN STILL BE SAVED";
+  }
+
+  if (
+    message.includes("access not claimed") ||
+    message.includes("unauthorized") ||
+    message.includes("jwt")
+  ) {
+    return "SPOTIFY AUTO-FETCH FAILED · ACCESS SESSION ERROR";
+  }
+
+  if (message.includes("listenbrainz") || message.includes("spotify")) {
+    return `SPOTIFY AUTO-FETCH FAILED · ${String(error?.message || "CHECK EDGE FUNCTION").toUpperCase()}`;
+  }
+
+  return "SPOTIFY AUTO-FETCH FAILED · SONG CAN STILL BE SAVED";
 }
 
 function delay(ms) {
