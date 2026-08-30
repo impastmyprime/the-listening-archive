@@ -13305,7 +13305,7 @@ body.wall-mode #archiveTools #randomSong {
   }
 }
 
-/* Archive and player refinements */
+/* Player */
 @media (min-width: 851px) and (hover: hover) and (pointer: fine) {
   #songList .song-row .expanded-number,
   #songList .song-row:hover .expanded-number,
@@ -13715,8 +13715,7 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
 }
 
 
-/* Source pills use one geometry on every breakpoint; the tiny baseline offset
-   compensates for the visual center of uppercase Inter glyphs. */
+/* Source controls */
 .player-bar .source-tab,
 .player-bar .source-tab[data-source="youtube"],
 .player-bar .source-tab[data-source="spotify"] {
@@ -13773,7 +13772,7 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
   }
 }
 
-/* Mobile Spotify handoff uses an inline SVG instead of the platform arrow glyph. */
+/* Mobile Spotify action */
 .player-bar .source-tab.is-mobile-spotify-open .source-tab-label {
   display: inline-flex !important;
   align-items: center !important;
@@ -13788,7 +13787,7 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
   overflow: visible;
 }
 
-/* Keep the desktop artist visually attached to the track title. */
+/* Desktop player spacing */
 @media (min-width: 769px) and (hover: hover) and (pointer: fine) {
   #playerArtist {
     margin-top: -2px !important;
@@ -13796,7 +13795,7 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
 }
 
 
-/* Background fallback standby: prepared invisibly while Spotify keeps playing. */
+/* Spotify background standby */
 .media-embed.spotify-mode {
   position: relative;
 }
@@ -13822,4 +13821,65 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
 .media-embed.spotify-mode > .spotify-player-mount {
   position: relative;
   z-index: 1;
+}
+
+/* Wall reveal */
+.wall-scroll-item {
+  isolation: isolate;
+}
+
+.wall-scroll-reveal-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--bg);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 500ms cubic-bezier(.2,.72,.2,1);
+}
+
+.wall-scroll-item.is-wall-visible > .wall-scroll-reveal-mask {
+  opacity: 0;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .wall-scroll-reveal-mask {
+    transition-duration: 430ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-scroll-reveal-mask {
+    display: none !important;
+  }
+}
+
+/* Mobile footer clearance */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  body.player-open .site-footer {
+    padding-bottom: calc(var(--pad) + 20px + env(safe-area-inset-bottom)) !important;
+  }
+
+  body.player-open #backToTop {
+    position: static !important;
+    z-index: auto !important;
+    transform: none !important;
+  }
+}
+
+/* Wrapped-title alignment */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .player-bar.title-wraps .source-tab .source-tab-label,
+  .player-bar.title-wraps .source-tab[data-source="youtube"] .source-tab-label,
+  .player-bar.title-wraps .source-tab[data-source="spotify"] .source-tab-label {
+    top: calc(.055em - 1px) !important;
+  }
+}
+
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  .player-bar.title-wraps .source-tab .source-tab-label,
+  .player-bar.title-wraps .source-tab[data-source="youtube"] .source-tab-label,
+  .player-bar.title-wraps .source-tab[data-source="spotify"] .source-tab-label {
+    top: .055em !important;
+  }
 }

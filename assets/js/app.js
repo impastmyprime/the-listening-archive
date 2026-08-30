@@ -89,7 +89,6 @@ let realtimeChannel = null;
 let songReadStateReady = false;
 let readSongIdsForCurrentPerson = new Set();
 const pendingSongReadIds = new Set();
-// Keep pending media state outside song objects so realtime row replacements cannot erase it.
 const pendingMediaLookupIds = new Set();
 const pendingYouTubeLookupIds = new Set();
 const pendingSpotifyLookupIds = new Set();
@@ -106,6 +105,8 @@ const PIXEL_DEFAULT_COLORS = [
 ];
 const PIXEL_RECENT_COLORS_STORAGE_PREFIX = "listening-archive-pixel-recent-colors-v2";
 const PIXEL_RECENT_COLORS_LIMIT = 4;
+const PIXEL_SNAPSHOT_CACHE_KEY = "listening-archive-pixel-board-snapshot-v1";
+const PIXEL_SNAPSHOT_SAVE_DELAY_MS = 220;
 const pixelState = Array.from({ length: PIXEL_COLS * PIXEL_ROWS }, () => ({ filled: false, color: "#FFD60A" }));
 const pendingPixelWrites = new Map();
 
@@ -120,6 +121,7 @@ let pixelLastPaintPoint = null;
 let pixelRenderQueued = false;
 let pixelTouchDrawingArmed = false;
 let pixelTouchArmTimer = null;
+let pixelSnapshotSaveTimer = null;
 let pixelRecentColors = [];
 
 const PIXEL_TOUCH_ARM_TIMEOUT_MS = 7000;
@@ -166,6 +168,11 @@ let youtubeStandbySong = null;
 let youtubeStandbyQueue = [];
 let youtubeStandbyPrimed = false;
 let youtubeStandbyPriming = false;
+let youtubeStandbyKeepAliveWorker = null;
+let youtubeStandbyKeepAliveTimer = null;
+let wallScrollObserver = null;
+let wallScrollItems = [];
+let wallRevealTimers = [];
 
 let spotifyIframeApiPromise = null;
 let spotifyIframeApi = null;
@@ -334,6 +341,93 @@ function setPixelBoardStatus(message, state = "idle") {
   pixelBoardStatus.classList.toggle("is-error", state === "error");
   pixelBoard.classList.toggle("is-syncing", state === "syncing");
   pixelBoardStage.classList.toggle("is-syncing", state === "syncing");
+}
+
+function resetPixelState() {
+  for (let i = 0; i < pixelState.length; i += 1) {
+    pixelState[i] = { filled: false, color: "#FFD60A" };
+  }
+}
+
+function applyPixelRows(rows = []) {
+  resetPixelState();
+
+  for (const row of rows) {
+    const x = Number(row?.x);
+    const y = Number(row?.y);
+
+    if (
+      !Number.isInteger(x) ||
+      !Number.isInteger(y) ||
+      x < 0 ||
+      x >= PIXEL_COLS ||
+      y < 0 ||
+      y >= PIXEL_ROWS
+    ) {
+      continue;
+    }
+
+    pixelState[pixelIndex(x, y)] = {
+      filled: row?.filled !== false,
+      color: row?.color || "#FFD60A"
+    };
+  }
+}
+
+function readPixelBoardSnapshot() {
+  try {
+    const raw = localStorage.getItem(PIXEL_SNAPSHOT_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.pixels)) return null;
+
+    return parsed.pixels.map(pixel => ({
+      x: Number(pixel?.[0]),
+      y: Number(pixel?.[1]),
+      filled: true,
+      color: String(pixel?.[2] || "#FFD60A")
+    }));
+  } catch {
+    return null;
+  }
+}
+
+function persistPixelBoardSnapshot() {
+  try {
+    const pixels = [];
+
+    for (let y = 0; y < PIXEL_ROWS; y += 1) {
+      for (let x = 0; x < PIXEL_COLS; x += 1) {
+        const pixel = pixelState[pixelIndex(x, y)];
+        if (!pixel?.filled) continue;
+        pixels.push([x, y, pixel.color || "#FFD60A"]);
+      }
+    }
+
+    localStorage.setItem(
+      PIXEL_SNAPSHOT_CACHE_KEY,
+      JSON.stringify({ pixels })
+    );
+  } catch { }
+}
+
+function schedulePixelSnapshotSave() {
+  clearTimeout(pixelSnapshotSaveTimer);
+  pixelSnapshotSaveTimer = window.setTimeout(() => {
+    pixelSnapshotSaveTimer = null;
+    persistPixelBoardSnapshot();
+  }, PIXEL_SNAPSHOT_SAVE_DELAY_MS);
+}
+
+function hydratePixelBoardSnapshot() {
+  const cachedRows = readPixelBoardSnapshot();
+  if (!cachedRows) return false;
+
+  applyPixelRows(cachedRows);
+  renderPixelBoard();
+  setPixelBoardStatus("REFRESHING…", "syncing");
+  return true;
 }
 
 function renderPixelBoard() {
@@ -819,6 +913,7 @@ function floodFillPixels(startX, startY) {
 
   rememberPixelColorUsage(pixelActiveColor);
   schedulePixelRender();
+  schedulePixelSnapshotSave();
 
   for (const pixel of changed) {
     queuePixelWrite(
@@ -869,6 +964,7 @@ function paintPixel(x, y) {
   }
 
   schedulePixelRender();
+  schedulePixelSnapshotSave();
 
   queuePixelWrite(
     x,
@@ -953,10 +1049,11 @@ function applyPixelRealtime(payload) {
   };
 
   schedulePixelRender();
+  schedulePixelSnapshotSave();
 }
 
-async function loadPixelBoard() {
-  setPixelBoardStatus("LOADING…");
+async function loadPixelBoard({ cachedPainted = false } = {}) {
+  setPixelBoardStatus(cachedPainted ? "REFRESHING…" : "LOADING…", "syncing");
   pixelBoardReady = false;
   pixelBoardClear.disabled = true;
   pixelBrushTool.disabled = true;
@@ -971,39 +1068,22 @@ async function loadPixelBoard() {
 
   const { data, error } = await supabaseClient
     .from("pixel_board")
-    .select("x,y,filled,color");
+    .select("x,y,color")
+    .eq("filled", true);
 
   if (error) {
     console.error("Pixel board setup/load failed:", error);
 
     setPixelBoardStatus(
-      "SETUP REQUIRED",
+      cachedPainted ? "CACHED · OFFLINE" : "SETUP REQUIRED",
       "error"
     );
 
-    renderPixelBoard();
+    if (!cachedPainted) renderPixelBoard();
     return false;
   }
 
-  for (let i = 0; i < pixelState.length; i += 1) {
-    pixelState[i] = { filled: false, color: "#FFD60A" };
-  }
-
-  for (const row of data || []) {
-    if (
-      Number.isInteger(row.x) &&
-      Number.isInteger(row.y) &&
-      row.x >= 0 &&
-      row.x < PIXEL_COLS &&
-      row.y >= 0 &&
-      row.y < PIXEL_ROWS
-    ) {
-      pixelState[pixelIndex(row.x, row.y)] = {
-        filled: Boolean(row.filled),
-        color: row.color || "#FFD60A"
-      };
-    }
-  }
+  applyPixelRows(data || []);
 
   pixelBoardReady = true;
   pixelBoardClear.disabled = false;
@@ -1018,6 +1098,7 @@ async function loadPixelBoard() {
     });
 
   renderPixelBoard();
+  persistPixelBoardSnapshot();
 
   setPixelBoardStatus(
     "LIVE · SYNCED",
@@ -1223,6 +1304,7 @@ pixelBoardClear.addEventListener(
     }
 
     renderPixelBoard();
+    persistPixelBoardSnapshot();
     setPixelBoardStatus("CLEARING…");
 
     const { error } =
@@ -1369,7 +1451,6 @@ function removeNewMarkerFromSongDom(songId) {
   const id = String(songId);
   document.querySelectorAll(".song-row").forEach(row => {
     if (String(row.dataset.id || "") !== id) return;
-    // Preserve the marker slot until the next render to avoid mobile reflow.
     row.classList.add("is-new-read");
     row.querySelectorAll(".latest-song-marker").forEach(marker => {
       marker.classList.add("is-read-placeholder");
@@ -1590,14 +1671,6 @@ function hydrateArchiveSnapshot() {
   return true;
 }
 
-function scheduleNonCriticalTask(task, timeout = 1200) {
-  if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(() => task(), { timeout });
-  } else {
-    window.setTimeout(task, 40);
-  }
-}
-
 function songDatasetSignature(list = songs) {
   return JSON.stringify((list || []).map(song => [
     String(song.id || ""),
@@ -1779,9 +1852,14 @@ async function unlockArchive(person, people) {
 
   refreshPeopleLabels();
 
-  // Paint cached content first, then refresh it from Supabase.
   const hadSnapshot = hydrateArchiveSnapshot();
+  const hadPixelSnapshot = hydratePixelBoardSnapshot();
   const previousReadState = songReadStateSignature();
+
+  loadPixelBoard({ cachedPainted: hadPixelSnapshot }).catch(error => {
+    console.error("Pixel board initialization failed:", error);
+    setPixelBoardStatus(hadPixelSnapshot ? "CACHED · OFFLINE" : "SETUP REQUIRED", "error");
+  });
 
   const readStatePromise = loadSongReadState({ preserveExisting: hadSnapshot }).catch(error => {
     console.warn("Read-state refresh failed:", error);
@@ -1802,19 +1880,9 @@ async function unlockArchive(person, people) {
       renderSongs();
     }
 
-    // Defer realtime until the first core refresh is complete.
     setupRealtime();
-
-    // Load non-critical pixel data after the archive is usable.
-    scheduleNonCriticalTask(() => {
-      loadPixelBoard().catch(error => {
-        console.error("Pixel board initialization failed:", error);
-        setPixelBoardStatus("SETUP REQUIRED", "error");
-      });
-    });
   });
 
-  // YouTube is loaded lazily when playback starts.
 }
 
 async function bootstrapSupabase() {
@@ -1867,8 +1935,6 @@ async function bootstrapSupabase() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") {
     if (currentSource === "spotify" && spotifyPlaybackMode === "full" && spotifyHasStarted) {
-      // Leaving the tab only arms the fallback. Spotify keeps playing until
-      // the current track ends; YouTube takes over only for the next song.
       void prepareSpotifyBackgroundYouTubeStandby();
       startSpotifyAutoNextWatchdog();
       syncSpotifyAutoNextDeadline();
@@ -1886,7 +1952,6 @@ document.addEventListener("visibilitychange", () => {
 
   if (!currentPerson) return;
 
-  // Re-render only when read state or song data changes.
   const previousReadState = songReadStateSignature();
 
   loadSongReadState()
@@ -2025,8 +2090,69 @@ backToTop.addEventListener("click", () => {
   });
 });
 
+window.addEventListener("resize", syncPlayerTitleWrapState, { passive: true });
+
+function stopYouTubeStandbyKeepAlive() {
+  if (youtubeStandbyKeepAliveWorker) {
+    try {
+      youtubeStandbyKeepAliveWorker.terminate();
+    } catch { }
+  }
+  youtubeStandbyKeepAliveWorker = null;
+
+  if (youtubeStandbyKeepAliveTimer) {
+    clearInterval(youtubeStandbyKeepAliveTimer);
+    youtubeStandbyKeepAliveTimer = null;
+  }
+}
+
+function keepYouTubeStandbyWarm(player = youtubeStandbyPlayer) {
+  if (!player || player !== youtubeStandbyPlayer || !youtubeStandbyPrimed) return;
+
+  try {
+    player.mute?.();
+    player.setVolume?.(0);
+
+    const state = player.getPlayerState?.();
+    const playingState = window.YT?.PlayerState?.PLAYING;
+    const pausedState = window.YT?.PlayerState?.PAUSED;
+    const cuedState = window.YT?.PlayerState?.CUED;
+    const currentTime = Number(player.getCurrentTime?.() || 0);
+
+    if (state === playingState) {
+      if (currentTime > 0.9) player.seekTo?.(0.05, true);
+      return;
+    }
+
+    if (state === pausedState || state === cuedState || state === -1) {
+      player.playVideo?.();
+    }
+  } catch { }
+}
+
+function startYouTubeStandbyKeepAlive() {
+  stopYouTubeStandbyKeepAlive();
+
+  const tick = () => keepYouTubeStandbyWarm();
+  tick();
+
+  try {
+    const workerUrl = URL.createObjectURL(
+      new Blob([`setInterval(() => postMessage("tick"), 420);`], {
+        type: "application/javascript"
+      })
+    );
+    youtubeStandbyKeepAliveWorker = new Worker(workerUrl);
+    URL.revokeObjectURL(workerUrl);
+    youtubeStandbyKeepAliveWorker.onmessage = tick;
+  } catch {
+    youtubeStandbyKeepAliveTimer = setInterval(tick, 550);
+  }
+}
+
 function destroyYouTubeStandby() {
   youtubeStandbyMountToken++;
+  stopYouTubeStandbyKeepAlive();
 
   if (youtubeStandbyPlayer && typeof youtubeStandbyPlayer.destroy === "function") {
     try {
@@ -2137,7 +2263,6 @@ function tryStartPendingSpotifyTrack() {
     return;
   }
 
-  // Prefer Spotify's URI confirmation; use a short timeout if state events lag.
   const loadReadyDelay = document.hidden
     ? SPOTIFY_HIDDEN_START_READY_MS
     : SPOTIFY_VISIBLE_START_READY_MS;
@@ -2276,7 +2401,6 @@ function syncSpotifyAutoNextDeadline(state = null) {
   if (spotifyLastBuffering) return;
 
   if (spotifyLastPaused) {
-    // Preserve a near-end deadline when Spotify resets position at natural completion.
     const msUntilPreviousDeadline = previousDeadline
       ? previousDeadline - now
       : Number.POSITIVE_INFINITY;
@@ -2287,13 +2411,11 @@ function syncSpotifyAutoNextDeadline(state = null) {
       return;
     }
 
-    // An early pause is treated as intentional.
     spotifyExpectedEndAt = 0;
     scheduleSpotifyAutoNextDeadlineTimer();
     return;
   }
 
-  // Track end time independently from Spotify's final state event.
   spotifyExpectedEndAt = now + remaining + 250;
   scheduleSpotifyAutoNextDeadlineTimer();
 }
@@ -2499,9 +2621,11 @@ async function prepareSpotifyBackgroundYouTubeStandby() {
             youtubeStandbyPriming = false;
             youtubeStandbyPrimed = true;
             try {
-              event.target.pauseVideo?.();
-              event.target.seekTo?.(0, true);
+              event.target.mute?.();
+              event.target.setVolume?.(0);
+              event.target.seekTo?.(0.05, true);
             } catch { }
+            startYouTubeStandbyKeepAlive();
             return;
           }
 
@@ -2606,6 +2730,7 @@ function activateSpotifyBackgroundYouTubeStandby() {
   youtubeAutoQueue = promotedQueue;
   youtubeNativeQueueActive = promotedQueue.length > 1;
 
+  stopYouTubeStandbyKeepAlive();
   youtubeStandbyPlayer = null;
   youtubeStandbySong = null;
   youtubeStandbyQueue = [];
@@ -2622,6 +2747,7 @@ function activateSpotifyBackgroundYouTubeStandby() {
 
   setScriptAwareText(playerTitle, nextSong.title);
   setScriptAwareText(playerArtist, nextSong.artist);
+  syncPlayerTitleWrapState();
   playerStatus.textContent = "BACKGROUND · YOUTUBE";
   renderSourceTabs(nextSong, "youtube");
   void markSongRead(nextSong);
@@ -2631,10 +2757,15 @@ function activateSpotifyBackgroundYouTubeStandby() {
   startYouTubeBackgroundQueueMonitor();
 
   try {
+    promotedPlayer.seekTo?.(0, true);
+    promotedPlayer.setPlaybackRate?.(1);
     promotedPlayer.unMute?.();
     promotedPlayer.setVolume?.(100);
-    promotedPlayer.seekTo?.(0, true);
-    promotedPlayer.playVideo?.();
+
+    const state = promotedPlayer.getPlayerState?.();
+    if (state !== window.YT?.PlayerState?.PLAYING) {
+      promotedPlayer.playVideo?.();
+    }
   } catch { }
 
   window.setTimeout(() => {
@@ -2709,7 +2840,6 @@ function spotifyUsesMobileEmbedUx() {
 function openSpotifyForFullPlayback(song = null) {
   const activeSong = song || songs.find(item => String(item.id) === String(currentSongId));
 
-  // Mobile full playback opens the native Spotify destination.
   if (spotifyUsesMobileEmbedUx()) {
     const target = spotifyTrackUrlOnly(activeSong?.spotifyUrl) || "https://open.spotify.com/";
     window.open(target, "_blank", "noopener,noreferrer");
@@ -2761,8 +2891,6 @@ function playNextSpotifySong() {
     return;
   }
 
-  // Let the current Spotify song finish. If the tab is still hidden at its
-  // natural end, promote the pre-initialized YouTube standby for the next song.
   if (document.hidden) {
     if (activateSpotifyBackgroundYouTubeStandby()) return;
     void prepareSpotifyBackgroundYouTubeStandby();
@@ -2801,6 +2929,7 @@ function playNextSpotifySong() {
 
   setScriptAwareText(playerTitle, nextSong.title);
   setScriptAwareText(playerArtist, nextSong.artist);
+  syncPlayerTitleWrapState();
   renderSourceTabs(nextSong, "spotify");
   playerStatus.textContent = "LOADING NEXT…";
   void markSongRead(nextSong);
@@ -2814,7 +2943,6 @@ function playNextSpotifySong() {
       spotifyController.loadEntity(spotifyPendingAutoStartUri || spotifyUrl);
       startSpotifyAutoNextWatchdog();
 
-      // Wait for the requested Spotify entity before starting it.
       setTimeout(tryStartPendingSpotifyTrack, 700);
       setTimeout(tryStartPendingSpotifyTrack, 1500);
     } catch {
@@ -2880,7 +3008,6 @@ async function mountSpotifyPlayer(song) {
       return;
     }
 
-    // Mount Spotify at the same mobile height as YouTube to avoid post-mount resizing.
     const spotifyEmbedHeight = window.matchMedia(
       "(max-width: 768px), (hover: none) and (pointer: coarse)"
     ).matches ? 112 : 152;
@@ -2952,7 +3079,6 @@ async function mountSpotifyPlayer(song) {
             songs.find(item => String(item.id) === String(currentSongId))?.spotifyUrl || song.spotifyUrl
           );
 
-          // Foreign URIs are treated as Spotify-controlled interstitial playback.
           if (startedUri && expectedUri && startedUri !== expectedUri) {
             spotifyInterstitialActive = true;
             spotifyExpectedEndAt = 0;
@@ -3004,7 +3130,6 @@ async function mountSpotifyPlayer(song) {
             songs.find(item => String(item.id) === String(currentSongId))?.spotifyUrl || song.spotifyUrl
           );
 
-          // Ignore archive automation while Spotify is playing a foreign URI.
           if (stateUri && expectedUri && stateUri !== expectedUri) {
             spotifyInterstitialActive = true;
             spotifyExpectedEndAt = 0;
@@ -3048,7 +3173,6 @@ async function mountSpotifyPlayer(song) {
             spotifyExpectedEndAt = 0;
             scheduleSpotifyAutoNextDeadlineTimer();
 
-            // Do not downgrade confirmed full playback because of a later short segment.
             if (spotifySessionHasFullPlayback) {
               spotifyInterstitialActive = true;
               return;
@@ -3058,7 +3182,6 @@ async function mountSpotifyPlayer(song) {
             if (!spotifyShortDurationFirstAt) spotifyShortDurationFirstAt = now;
             spotifyShortDurationEvidence += 1;
 
-            // Require stable short-duration evidence before declaring preview mode.
             if (
               spotifyShortDurationEvidence >= 3 &&
               now - spotifyShortDurationFirstAt >= 650 &&
@@ -3199,6 +3322,7 @@ function syncYouTubeQueueSong(player = youtubePlayer) {
     currentSource = "youtube";
     setScriptAwareText(playerTitle, song.title);
     setScriptAwareText(playerArtist, song.artist);
+    syncPlayerTitleWrapState();
     playerStatus.textContent = activePlaybackStatusText();
     renderSourceTabs(song, "youtube");
     void markSongRead(song);
@@ -3243,7 +3367,6 @@ function playNextSong() {
   if (preferredSource === "youtube") {
     const nextVideoId = getYouTubeVideoId(nextSong.youtubeUrl);
 
-    // Reuse the active YouTube player to preserve continuous playback.
     if (
       youtubePlayer &&
       nextVideoId &&
@@ -3253,6 +3376,7 @@ function playNextSong() {
       currentSource = "youtube";
       setScriptAwareText(playerTitle, nextSong.title);
       setScriptAwareText(playerArtist, nextSong.artist);
+      syncPlayerTitleWrapState();
       renderSourceTabs(nextSong, "youtube");
       playerStatus.textContent = activePlaybackStatusText();
       void markSongRead(nextSong);
@@ -3275,7 +3399,6 @@ function playNextSong() {
   }
 
   if (preferredSource) {
-    // Briefly debounce duplicate ENDED events.
     playSong(nextSong, preferredSource, {
       backgroundFallback:
         backgroundYoutubeFallbackActive && preferredSource === "youtube"
@@ -3368,7 +3491,6 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
           clearInterval(youtubePlaybackMonitor);
           youtubePlaybackWorker?.terminate?.();
 
-          // Worker ticks keep queue checks responsive in background tabs.
           try {
             youtubePlaybackWorker = new Worker(
               URL.createObjectURL(
@@ -3418,7 +3540,6 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
 
           if (event.data !== window.YT.PlayerState.ENDED) return;
 
-          // Drive queue changes locally so newly added songs remain available.
           const activeItem = syncYouTubeQueueSong(event.target);
 
           if (youtubeNativeQueueHasNext(event.target)) return;
@@ -3532,7 +3653,6 @@ async function resolveAlbumMetadataViaSupabase(songList, { force = false, limit 
 
   let resolvedAny = false;
 
-  // Limit concurrent resolver calls to protect external endpoints.
   const concurrency = 3;
   for (let start = 0; start < candidates.length; start += concurrency) {
     const batch = candidates.slice(start, start + concurrency);
@@ -3585,7 +3705,6 @@ function ensureWallAlbumMetadata(songList) {
   const missing = (songList || []).filter(song => !hasStoredAlbumMetadata(song) || needsKnownAlbumCorrection(song));
   if (!missing.length || albumMetadataFunctionUnavailable) return;
 
-  // Backfill album metadata asynchronously without reshuffling the active wall.
   if (!albumMetadataBackfillPromise) {
     albumMetadataBackfillPromise = resolveAlbumMetadataViaSupabase(missing)
       .finally(() => { albumMetadataBackfillPromise = null; });
@@ -3614,7 +3733,6 @@ function artworkPlaceholder(song) {
 
 function youtubeArtwork(song) {
   const id = getYouTubeVideoId(song.youtubeUrl);
-  // mqdefault is 16:9 and crops cleanly into square wall cells.
   return id ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg` : "";
 }
 
@@ -3673,7 +3791,6 @@ async function bandcampArtworkFromPage(pageUrl) {
     } catch { }
   }
 
-  // Stable fallback when Bandcamp oEmbed is blocked by CORS.
   try {
     const response = await fetchWithPrototypeTimeout(
       `https://open.spotify.com/oembed?url=${encodeURIComponent(MOGWAI_HAPPY_SONGS_SPOTIFY_URL)}`,
@@ -3747,7 +3864,6 @@ function getPrototypeAlbumOverride(song) {
   const artist = normalizeArtworkText(song?.artist || "");
   const suppliedAlbumName = normalizeArtworkText(String(song?.albumName || ""));
 
-  // Wall-art overrides for known metadata mismatches.
   if (title === normalizeArtworkText("Muffled Beneath the Sound of the Ocean")) {
     return {
       url: "https://f4.bcbits.com/img/a3889476287_16.jpg",
@@ -3759,7 +3875,6 @@ function getPrototypeAlbumOverride(song) {
     };
   }
 
-  // Resolve known Mogwai metadata from its canonical source.
   if (suppliedAlbumName === normalizeArtworkText("Mogwai") ||
       suppliedAlbumName === normalizeArtworkText("Happy Songs for Happy People") ||
       title === normalizeArtworkText("Mogwai")) {
@@ -3804,14 +3919,12 @@ async function resolvePrototypeAlbum(song) {
 
   let albumKey = "";
   if (apple?.releaseType === "single") {
-    // Keep singles grouped by song rather than release metadata.
     albumKey = `single:${String(song.id)}`;
   } else if (apple?.albumId) {
     albumKey = `apple:${apple.albumId}`;
   } else if (spotifyUrl) {
     albumKey = `art:${stableArtworkIdentity(spotifyUrl)}`;
   } else {
-    // Keep unresolved releases separate to avoid false album grouping.
     albumKey = `song:${String(song.id)}`;
   }
 
@@ -3824,7 +3937,6 @@ async function resolvePrototypeAlbum(song) {
     releaseType: apple?.releaseType || "album"
   };
 
-  // Apply album-level overrides after external metadata resolution.
   const normalizedAlbumName = normalizeArtworkText(result?.albumName || "");
   if (normalizedAlbumName === normalizeArtworkText("Mogwai") ||
       normalizedAlbumName === normalizeArtworkText("Happy Songs for Happy People")) {
@@ -3877,7 +3989,6 @@ function makeAlbumGroups(resolvedSongs) {
     if (!group.albumName && album.albumName) group.albumName = album.albumName;
   });
 
-  // Preserve newest-first album order.
   return Array.from(groups.values());
 }
 
@@ -3928,7 +4039,6 @@ function renderTrueWallHalftone(source, canvas) {
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) return false;
 
-  // Downsample to one luminance sample per halftone cell.
   const sample = document.createElement("canvas");
   sample.width = cols;
   sample.height = rows;
@@ -3956,12 +4066,10 @@ function renderTrueWallHalftone(source, canvas) {
       const alpha = pixels[i + 3] / 255;
       const luminance = ((pixels[i] * 0.2126) + (pixels[i + 1] * 0.7152) + (pixels[i + 2] * 0.0722)) / 255;
 
-      // Preserve midtones while slightly deepening shadows and highlights.
       let tone = Math.max(0, Math.min(1, luminance * alpha));
       tone = Math.max(0, Math.min(1, (tone - 0.045) / 0.91));
       tone = Math.pow(tone, 0.95);
 
-      // Keep dots small enough to preserve image detail.
       const radius = 0.12 + tone * 2.02;
       if (radius <= 0.16) continue;
 
@@ -4061,7 +4169,6 @@ function makeAlbumInfoCell(group) {
   const tracks = document.createElement("div");
   tracks.className = "album-editorial-tracks";
 
-  // Wall captions contain album, recommended tracks, and artist only.
   group.songs.forEach(song => {
     const button = document.createElement("button");
     button.type = "button";
@@ -4094,7 +4201,6 @@ function wallLayoutHash(value) {
 }
 
 function appendAlbumCollage(groups) {
-  // Balance cover, caption, yellow, and blank cells across columns.
   const dominoSlots = [[0, 1], [2, 3], [4, 5]];
   const templates = [];
 
@@ -4183,19 +4289,16 @@ function appendAlbumCollage(groups) {
       const repeatedBlankCount = blankColumns.filter(col => previousBlankColumns.includes(col)).length;
       let score = 0;
 
-      // Prioritize even cover distribution.
       score += (nextMaxCover - nextMinCover) * 2500;
       score += coverVariance * 220;
       score += repeatedCoverCount * 420;
       if (coverColumns.join(",") === previousCoverColumns.join(",")) score += 1800;
 
-      // Spread blank cells across columns.
       score += blankColumns.reduce((sum, col) => sum + blankColumnCounts[col], 0) * 80;
       score += repeatedBlankCount * 110;
       if (blankColumns.join(",") === previousBlankColumns.join(",")) score += 550;
 
       if (useYellowThisRow) {
-        // Give each column one yellow cell before assigning a second.
         score += (solidColumnCounts[solidColumn] - minSolidCount) * 5000;
         if (previousSolidColumn === solidColumn) score += 900;
       }
@@ -4217,7 +4320,6 @@ function appendAlbumCollage(groups) {
     if (canUseSolid) solidColumnCounts[chosenSolidColumn] += 1;
     chosenCoverColumns.forEach(col => { coverColumnCounts[col] += 1; });
     chosenBlankColumns.forEach(col => {
-      // Count the unused solid cell as blank space on non-yellow rows.
       blankColumnCounts[col] += 1;
     });
     if (!canUseSolid && chosenSolidColumn >= 0) blankColumnCounts[chosenSolidColumn] += 1;
@@ -4262,6 +4364,76 @@ function wallVisibleSongSignature(songList = getWallSongs()) {
   return (songList || []).map(song => String(song.id)).join("|");
 }
 
+function stopWallScrollAnimation() {
+  wallScrollObserver?.disconnect?.();
+  wallScrollObserver = null;
+  wallRevealTimers.forEach(timer => clearTimeout(timer));
+  wallRevealTimers = [];
+
+  wallScrollItems.forEach(item => {
+    item.classList.remove("wall-scroll-item", "is-wall-visible");
+    item.querySelector(":scope > .wall-scroll-reveal-mask")?.remove();
+  });
+  wallScrollItems = [];
+  coverWall?.classList.remove("wall-scroll-active");
+}
+
+function shuffleWallRevealItems(items) {
+  const shuffled = items.slice();
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function initWallScrollAnimation() {
+  stopWallScrollAnimation();
+  if (!coverWall || wallView?.hidden) return;
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  wallScrollItems = Array.from(
+    coverWall.querySelectorAll(".album-editorial-cell:not(.is-blank)")
+  );
+
+  coverWall.classList.toggle("wall-scroll-active", !reduceMotion && wallScrollItems.length > 0);
+
+  wallScrollItems.forEach(item => {
+    item.classList.add("wall-scroll-item");
+    if (reduceMotion) {
+      item.classList.add("is-wall-visible");
+      return;
+    }
+
+    const mask = document.createElement("span");
+    mask.className = "wall-scroll-reveal-mask";
+    mask.setAttribute("aria-hidden", "true");
+    item.appendChild(mask);
+  });
+
+  if (reduceMotion || !wallScrollItems.length) return;
+
+  wallScrollObserver = new IntersectionObserver(entries => {
+    const entering = shuffleWallRevealItems(
+      entries.filter(entry => entry.isIntersecting).map(entry => entry.target)
+    );
+
+    entering.forEach((item, order) => {
+      wallScrollObserver?.unobserve(item);
+      const delay = order * 70 + Math.floor(Math.random() * 55);
+      const timer = window.setTimeout(() => {
+        item.classList.add("is-wall-visible");
+      }, delay);
+      wallRevealTimers.push(timer);
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: "0px 0px -5% 0px"
+  });
+
+  wallScrollItems.forEach(item => wallScrollObserver.observe(item));
+}
+
 async function renderWall() {
   if (!coverWall || !wallEmpty) return;
   const token = ++wallRenderToken;
@@ -4277,7 +4449,6 @@ async function renderWall() {
     return;
   }
 
-  // Render stored metadata immediately and resolve missing data in background.
   const resolved = wallSongs.map(song => ({
     song,
     album: hasStoredAlbumMetadata(song)
@@ -4291,8 +4462,8 @@ async function renderWall() {
   wallEmpty.hidden = groups.length > 0;
   if (wallAlbumCount) wallAlbumCount.textContent = `${groups.length} ALBUM${groups.length === 1 ? "" : "S"}`;
   appendAlbumCollage(groups);
+  requestAnimationFrame(initWallScrollAnimation);
 
-  // Start metadata backfill after first paint.
   ensureWallAlbumMetadata(wallSongs);
 }
 
@@ -4335,6 +4506,8 @@ function setView(view) {
 
   document.body.classList.toggle("stats-mode", isStats);
   document.body.classList.toggle("wall-mode", isWall);
+
+  if (!isWall) stopWallScrollAnimation();
 
   if (isStats) {
     renderStats();
@@ -4403,8 +4576,6 @@ async function updateSongMediaPatch(song, patch) {
 
   if (error) throw error;
 
-  // Update both the object owned by the background task and whichever fresh
-  // object Supabase realtime may already have remapped into the songs array.
   applySongMediaPatchToObject(song, patch);
   const liveSong = songs.find(item => String(item.id || "") === String(song.id || ""));
   if (liveSong && liveSong !== song) {
@@ -4421,8 +4592,6 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
   const tasks = [];
   const songId = String(song?.id || "");
 
-  // Keep pending state outside the song object. Supabase realtime replaces song
-  // objects after INSERT/UPDATE events, but the ID survives those remaps.
   song.mediaLookupPending = shouldFindYouTube || shouldFindSpotify;
   if (songId) {
     if (song.mediaLookupPending) pendingMediaLookupIds.add(songId);
@@ -4437,7 +4606,6 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
       try {
         const match = await findYouTubeSong(title, artist);
         if (match?.url) {
-          // Update immediately. Do not wait for Spotify if YouTube finishes first.
           await updateSongMediaPatch(song, {
             youtube_url: match.url
           });
@@ -4514,7 +4682,6 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
     })());
   }
 
-  // Start both lookups together and persist each source as soon as it resolves.
   await Promise.allSettled(tasks);
   song.mediaLookupPending = false;
   if (songId) {
@@ -4530,10 +4697,8 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
 
 async function enrichNewSongInBackground(song, options) {
   try {
-    // Media enrichment runs in the background.
     await enrichSongMediaInBackground(song, options);
 
-    // Resolve album metadata after media lookup so it can reuse discovered identifiers.
     const resolvedAlbum = await resolveAlbumMetadataViaSupabase(
       [song],
       { limit: 1 }
@@ -4584,7 +4749,6 @@ form.addEventListener("submit", async event => {
   }
 
   try {
-    // Save user-entered content first; media links are background enrichment.
     const { data: inserted, error } = await supabaseClient
       .from("songs")
       .insert({
@@ -4641,10 +4805,8 @@ form.addEventListener("submit", async event => {
 
     renderSongs();
 
-    // Close as soon as Supabase confirms the insert.
     dialog.close();
 
-    // Do not block the UI on background enrichment.
     if (newSong) {
       void enrichNewSongInBackground(newSong, {
         title,
@@ -4920,7 +5082,6 @@ function playSong(song, requestedSource = null, options = {}) {
 
   const source = requestedSource || (youtubeId ? "youtube" : spotifyEmbedUrl ? "spotify" : null);
 
-  // Open the player while background media lookup is still pending.
   if (!source && isSongMediaLookupPending(song)) {
     void markSongRead(song);
     currentSource = null;
@@ -4977,8 +5138,6 @@ function playSong(song, requestedSource = null, options = {}) {
     mediaEmbed.className = "media-embed spotify-mode";
     mediaEmbed.innerHTML = "";
 
-    // Preload the YouTube API while Spotify is active. Once full playback is
-    // confirmed, the next YouTube track is primed silently as a standby.
     if (youtubeId) {
       void ensureYouTubeApi().catch(() => {});
     }
@@ -5157,11 +5316,23 @@ function getSpotifyEmbedUrl(url) {
   }
 }
 
+function syncPlayerTitleWrapState() {
+  if (!playerBar || !playerTitle || playerBar.hidden) return;
+
+  requestAnimationFrame(() => {
+    const style = getComputedStyle(playerTitle);
+    const lineHeight = Number.parseFloat(style.lineHeight) || 0;
+    const wraps = lineHeight > 0 && playerTitle.scrollHeight > lineHeight * 1.45;
+    playerBar.classList.toggle("title-wraps", wraps);
+  });
+}
+
 function revealPlayer(song) {
   currentSongId = song.id;
   setScriptAwareText(playerTitle, song.title);
   setScriptAwareText(playerArtist, song.artist);
   playerBar.hidden = false;
+  syncPlayerTitleWrapState();
   document.body.classList.add("player-open");
   requestAnimationFrame(() => playerBar.classList.add("is-visible"));
   syncPlayButtons();
@@ -5174,6 +5345,7 @@ function closePlayer() {
   setTimeout(() => {
     playerBar.hidden = true;
     mediaEmbed.innerHTML = "";
+    playerBar.classList.remove("title-wraps");
     document.body.classList.remove("player-open");
   }, 220);
   currentSongId = null;
@@ -5204,7 +5376,6 @@ function refreshOpenPlayerSourceState(song) {
   const latestSong = songs.find(item => String(item.id || "") === String(song.id || "")) || song;
   renderSourceTabs(latestSong, currentSource);
 
-  // Do not remount active playback when another source finishes resolving.
   if (currentSource) return;
 
   const youtubeReady = Boolean(getYouTubeVideoId(latestSong.youtubeUrl));
@@ -5249,7 +5420,6 @@ function isSongMediaLookupPending(song) {
   if (isYouTubeLookupPending(song) || isSpotifyLookupPending(song)) return true;
   if (song.mediaLookupPending) return true;
 
-  // Persisted pending status covers realtime remaps before local lookup state is attached.
   const hasPlayableLink =
     Boolean(getYouTubeVideoId(song.youtubeUrl)) ||
     Boolean(getSpotifyEmbedUrl(song.spotifyUrl));
@@ -5349,7 +5519,6 @@ function stabilizeMobileArchiveHorizontalPosition() {
   setTimeout(reset, 240);
 }
 
-// Prevent native long-press effects from changing mobile title geometry.
 ["contextmenu", "selectstart", "dragstart"].forEach(type => {
   songList?.addEventListener(type, event => {
     if (!mobileSongLayoutQuery.matches) return;
@@ -5364,12 +5533,10 @@ function stabilizeMobileArchiveHorizontalPosition() {
     const row = event.target.closest(".song-row");
     row?.querySelector(".song-title")?.blur?.();
 
-    // Keep the mobile archive horizontally anchored.
     stabilizeMobileArchiveHorizontalPosition();
   }, { passive: true });
 });
 
-// Remove touch focus styling without blocking click behavior.
 songList?.addEventListener("pointerdown", event => {
   if (!mobileSongLayoutQuery.matches || event.pointerType === "mouse") return;
   const control = event.target.closest('.song-row button, .song-row [role="button"]');
@@ -5392,7 +5559,6 @@ function updateMobileSongWrapState(row) {
   const titleSpan = titleText?.querySelector(":scope > span:first-child");
   if (!titleText || !titleSpan) return;
 
-  // Use line rects to measure wrapping and position the NEW marker.
   const range = document.createRange();
   range.selectNodeContents(titleSpan);
   const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
@@ -5467,12 +5633,10 @@ function renderSongs() {
     let mobileDetailsToggle = fragment.querySelector(".mobile-details-toggle");
 
     if (mobileSongLayoutQuery.matches) {
-      // Keep mobile controls out of focus navigation.
       if (playButton) playButton.tabIndex = -1;
       if (mobileDetailsToggle) mobileDetailsToggle.tabIndex = -1;
     }
 
-    // Use a neutral role=button control to avoid synthetic mobile button states.
     if (mobileSongLayoutQuery.matches && titleButton?.tagName === "BUTTON") {
       const mobileTitle = document.createElement("div");
       mobileTitle.className = titleButton.className;
@@ -5484,7 +5648,6 @@ function renderSongs() {
       titleButton = mobileTitle;
     }
 
-    // Apply the same neutral control treatment to NOTE.
     if (mobileSongLayoutQuery.matches && mobileDetailsToggle?.tagName === "BUTTON") {
       const mobileNoteToggle = document.createElement("div");
       mobileNoteToggle.className = mobileDetailsToggle.className;
@@ -5528,7 +5691,6 @@ function renderSongs() {
       });
     }
 
-    // Let the full desktop row start playback, excluding dedicated controls.
     row.addEventListener("click", event => {
       const isDesktopPointer = window.matchMedia(
         "(min-width: 851px) and (hover: hover) and (pointer: fine)"
@@ -5549,7 +5711,6 @@ function renderSongs() {
     mobileDetailsToggle.addEventListener("click", event => {
       event.stopPropagation();
 
-      // Preserve the row viewport position while toggling details.
       const beforeTop = mobileSongLayoutQuery.matches
         ? row.getBoundingClientRect().top
         : null;
@@ -5571,7 +5732,6 @@ function renderSongs() {
       mobileDetailsToggle.textContent = willOpen ? "NOTE −" : "NOTE +";
       event.currentTarget.blur?.();
 
-      // NOTE does not change title width, so no wrap re-measure is needed.
       if (beforeTop !== null) {
         requestAnimationFrame(() => {
           const afterTop = row.getBoundingClientRect().top;
@@ -6238,7 +6398,6 @@ function bindTimelineClusterPreview(element, cluster) {
   });
 
   element.addEventListener("click", event => {
-    // Coarse pointers use tap inspection; desktop remains hover-only.
     if (!statsUseTapInteraction()) return;
 
     event.preventDefault();
@@ -6374,7 +6533,6 @@ function buildMobileSequenceTimeline(ordered, viewportWidth) {
 }
 
 function buildTimelineClusters(ordered, start, span, trackWidth) {
-  // Keep one chronological point per song at every viewport size.
   return buildMobileSequenceTimeline(ordered, trackWidth);
 }
 
@@ -6418,7 +6576,6 @@ function bindTimelineTapEffect(dot) {
     if (!statsUseTapInteraction()) return;
     if (event.pointerType === "mouse") return;
 
-    // Track movement only; press-and-hold has no visual state.
     startX = event.clientX;
     startY = event.clientY;
     moved = false;
@@ -6440,7 +6597,6 @@ function bindTimelineTapEffect(dot) {
     if (!statsUseTapInteraction()) return;
     if (event.pointerType === "mouse" || moved) return;
 
-    // Persist the mobile selection after a completed tap.
     document.querySelectorAll(".timeline-dot.is-selected").forEach(otherDot => {
       if (otherDot !== dot) otherDot.classList.remove("is-selected");
     });
@@ -6794,7 +6950,6 @@ function bindTooltip(element, allowHtml = false) {
       statsTooltip.dataset.triggerId === triggerId;
 
     if (sameTrigger) {
-      // Re-tapping a selected timeline dot keeps its tooltip open.
       if (element.classList.contains("timeline-dot") && element.classList.contains("is-selected")) {
         showStatsTooltip(event, content);
         statsTooltip.dataset.triggerId = triggerId;
@@ -6818,7 +6973,6 @@ document.addEventListener("click", event => {
   if (!statsUseTapInteraction()) return;
   if (event.target.closest('[data-stats-tooltip-trigger="true"]')) return;
 
-  // Clear persistent timeline selection only from an empty-space tap.
   document.querySelectorAll(".timeline-dot.is-selected").forEach(dot => {
     dot.classList.remove("is-selected");
   });
