@@ -13772,3 +13772,25 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
     top: calc(.055em + 1px) !important;
   }
 }
+
+/* Mobile Spotify handoff uses an inline SVG instead of the platform arrow glyph. */
+.player-bar .source-tab.is-mobile-spotify-open .source-tab-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+.player-bar .source-tab.is-mobile-spotify-open .source-tab-icon {
+  display: block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  overflow: visible;
+}
+
+/* Keep the desktop artist visually attached to the track title. */
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+  #playerArtist {
+    margin-top: -2px !important;
+  }
+}

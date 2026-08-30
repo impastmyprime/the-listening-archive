@@ -128,8 +128,8 @@ let currentFilter = "all";
 let searchTerm = "";
 let currentSongId = null;
 let currentSource = null;
+let backgroundYoutubeFallbackActive = false;
 
-const AUTO_NEXT_STORAGE = "songs-we-sent-auto-next-v1";
 const STARTUP_LOADER_MIN_VISIBLE_MS = 1750;
 
 async function holdStartupLoaderUntilMinimumDuration() {
@@ -151,11 +151,7 @@ function finishArchiveStartupLoader() {
 }
 
 
-// Auto Next resets to enabled on each page load.
 let autoNextEnabled = true;
-try {
-  localStorage.setItem(AUTO_NEXT_STORAGE, "true");
-} catch { }
 let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeMountToken = 0;
@@ -177,10 +173,24 @@ let spotifyAwaitingSignInRetry = false;
 let spotifyAutoplayTimer = null;
 let spotifyAutoNextWorker = null;
 let spotifyAutoNextMonitor = null;
+let spotifyAutoNextDeadlineTimer = null;
 let spotifyExpectedEndAt = 0;
 let spotifyLastUpdateAt = 0;
 let spotifyLastPaused = true;
 let spotifyLastBuffering = false;
+let spotifyPendingAutoStartSongId = null;
+let spotifyPendingAutoStartUri = "";
+let spotifyPendingEntityReady = false;
+let spotifyPendingLoadRequestedAt = 0;
+let spotifyCurrentPlayingUri = "";
+let spotifyAutoStartAttempts = 0;
+let spotifyInterstitialActive = false;
+let spotifySessionHasFullPlayback = false;
+let spotifyShortDurationEvidence = 0;
+let spotifyShortDurationFirstAt = 0;
+
+const SPOTIFY_HIDDEN_START_READY_MS = 180;
+const SPOTIFY_VISIBLE_START_READY_MS = 650;
 
 const songList = document.querySelector("#songList");
 const songCount = document.querySelector("#songCount");
@@ -1464,7 +1474,6 @@ function mapRemoteSong(row) {
     spotifyMatchConfidence: row.spotify_match_confidence ?? null,
     note: String(row.note || ""),
     senderPerson,
-    createdBy: row.created_by || null,
     recommendedBy: senderPerson === currentPerson ? "me" : "friend",
     createdAt: row.created_at || new Date().toISOString(),
     albumName: String(row.album_name || ""),
@@ -1509,9 +1518,14 @@ function readCachedSongSnapshot() {
 
 function writeCachedSongSnapshot(songList) {
   try {
+    const privacySafeSnapshot = (songList || []).slice(0, 500).map(song => ({
+      ...song,
+      note: ""
+    }));
+
     localStorage.setItem(
       SONG_SNAPSHOT_CACHE_KEY,
-      JSON.stringify((songList || []).slice(0, 500))
+      JSON.stringify(privacySafeSnapshot)
     );
   } catch { }
 }
@@ -1621,7 +1635,7 @@ async function loadRemoteSongs({ quiet = false, forceRender = false } = {}) {
   const { data, error } = await supabaseClient
     .from("songs")
     .select(
-      "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
+      "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
     )
     .order("created_at", { ascending: false });
 
@@ -1844,10 +1858,25 @@ async function bootstrapSupabase() {
 
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
+  if (document.visibilityState !== "visible") {
+    if (currentSource === "spotify" && spotifyPlaybackMode === "full" && spotifyHasStarted) {
+      startSpotifyAutoNextWatchdog();
+      syncSpotifyAutoNextDeadline();
+
+      // Preload YouTube so hidden-tab fallback can start without script-loading delay.
+      if (nextYouTubeSong(currentSongId)) {
+        void ensureYouTubeApi().catch(() => {});
+      }
+    }
+    return;
+  }
 
   if (currentSource === "youtube" && youtubePlayer) {
     syncYouTubeQueueSong(youtubePlayer);
+  }
+
+  if (currentSource === "spotify") {
+    handleSpotifyBackgroundTick();
   }
 
   if (!currentPerson) return;
@@ -1945,6 +1974,10 @@ viewButtons.forEach(button => {
 });
 
 function activePlaybackStatusText() {
+  if (backgroundYoutubeFallbackActive && currentSource === "youtube") {
+    return "BACKGROUND · YOUTUBE";
+  }
+
   return autoNextEnabled ? "AUTO NEXT ON" : "NOW PLAYING";
 }
 
@@ -1955,9 +1988,6 @@ function syncPlaybackPreferenceUi() {
 
 autoNextToggle.addEventListener("click", () => {
   autoNextEnabled = !autoNextEnabled;
-  try {
-    localStorage.setItem(AUTO_NEXT_STORAGE, String(autoNextEnabled));
-  } catch { }
   syncPlaybackPreferenceUi();
 
   if (currentSource === "youtube" && currentSongId && youtubePlayer) {
@@ -2046,10 +2076,20 @@ function stopSpotifyAutoNextWatchdog() {
   spotifyLastUpdateAt = 0;
   spotifyLastPaused = true;
   spotifyLastBuffering = false;
+  spotifyPendingAutoStartSongId = null;
+  spotifyPendingAutoStartUri = "";
+  spotifyPendingEntityReady = false;
+  spotifyPendingLoadRequestedAt = 0;
+  spotifyAutoStartAttempts = 0;
 
   if (spotifyAutoNextMonitor) {
     clearInterval(spotifyAutoNextMonitor);
     spotifyAutoNextMonitor = null;
+  }
+
+  if (spotifyAutoNextDeadlineTimer) {
+    clearTimeout(spotifyAutoNextDeadlineTimer);
+    spotifyAutoNextDeadlineTimer = null;
   }
 
   if (spotifyAutoNextWorker) {
@@ -2058,6 +2098,39 @@ function stopSpotifyAutoNextWatchdog() {
     } catch { }
     spotifyAutoNextWorker = null;
   }
+}
+
+function tryStartPendingSpotifyTrack() {
+  if (
+    !spotifyPendingAutoStartSongId ||
+    !spotifyPendingAutoStartUri ||
+    String(currentSongId) !== String(spotifyPendingAutoStartSongId) ||
+    currentSource !== "spotify" ||
+    spotifyHasStarted ||
+    spotifyInterstitialActive ||
+    !spotifyController
+  ) {
+    return;
+  }
+
+  // Prefer Spotify's URI confirmation; use a short timeout if state events lag.
+  const loadReadyDelay = document.hidden
+    ? SPOTIFY_HIDDEN_START_READY_MS
+    : SPOTIFY_VISIBLE_START_READY_MS;
+  const loadSettledByTime =
+    spotifyPendingLoadRequestedAt > 0 &&
+    Date.now() - spotifyPendingLoadRequestedAt >= loadReadyDelay;
+  if (!spotifyPendingEntityReady && !loadSettledByTime) return;
+
+  spotifyAutoStartAttempts += 1;
+
+  try {
+    if (typeof spotifyController.resume === "function") {
+      spotifyController.resume();
+    } else if (typeof spotifyController.play === "function") {
+      spotifyController.play();
+    }
+  } catch { }
 }
 
 function checkSpotifyAutoNextDeadline() {
@@ -2069,16 +2142,39 @@ function checkSpotifyAutoNextDeadline() {
     !autoNextEnabled ||
     currentSource !== "spotify" ||
     spotifyPlaybackMode !== "full" ||
-    !spotifyHasStarted ||
-    spotifyLastPaused ||
-    spotifyLastBuffering
+    spotifyInterstitialActive ||
+    !spotifyHasStarted
   ) {
     return;
   }
 
   spotifyEndHandled = true;
   spotifyExpectedEndAt = 0;
+  if (spotifyAutoNextDeadlineTimer) {
+    clearTimeout(spotifyAutoNextDeadlineTimer);
+    spotifyAutoNextDeadlineTimer = null;
+  }
   playNextSpotifySong();
+}
+
+function handleSpotifyBackgroundTick() {
+  checkSpotifyAutoNextDeadline();
+
+  if (spotifyPendingAutoStartSongId && !spotifyHasStarted) {
+    if (document.hidden && spotifyAutoStartAttempts >= 8) {
+      const pendingSong = songs.find(
+        item => String(item.id) === String(spotifyPendingAutoStartSongId)
+      );
+
+      if (handoffSpotifyBackgroundToYouTube(pendingSong)) return;
+    }
+
+    if (spotifyAutoStartAttempts < 24) {
+      tryStartPendingSpotifyTrack();
+    } else if (playerStatus) {
+      playerStatus.textContent = "PRESS PLAY";
+    }
+  }
 }
 
 function startSpotifyAutoNextWatchdog() {
@@ -2086,25 +2182,43 @@ function startSpotifyAutoNextWatchdog() {
 
   try {
     const workerUrl = URL.createObjectURL(
-      new Blob([`setInterval(() => postMessage("tick"), 500);`], {
+      new Blob([`setInterval(() => postMessage("tick"), 180);`], {
         type: "application/javascript"
       })
     );
 
     spotifyAutoNextWorker = new Worker(workerUrl);
     URL.revokeObjectURL(workerUrl);
-    spotifyAutoNextWorker.onmessage = checkSpotifyAutoNextDeadline;
+    spotifyAutoNextWorker.onmessage = handleSpotifyBackgroundTick;
   } catch {
-    spotifyAutoNextMonitor = setInterval(checkSpotifyAutoNextDeadline, 750);
+    spotifyAutoNextMonitor = setInterval(handleSpotifyBackgroundTick, 500);
   }
 }
 
+function scheduleSpotifyAutoNextDeadlineTimer() {
+  if (spotifyAutoNextDeadlineTimer) {
+    clearTimeout(spotifyAutoNextDeadlineTimer);
+    spotifyAutoNextDeadlineTimer = null;
+  }
+
+  if (!spotifyExpectedEndAt) return;
+
+  const delay = Math.max(50, spotifyExpectedEndAt - Date.now());
+  spotifyAutoNextDeadlineTimer = setTimeout(() => {
+    spotifyAutoNextDeadlineTimer = null;
+    checkSpotifyAutoNextDeadline();
+  }, delay);
+}
+
 function syncSpotifyAutoNextDeadline(state = null) {
+  const now = Date.now();
+  const previousDeadline = spotifyExpectedEndAt;
+
   if (state) {
     const duration = Number(state.duration || spotifyLastDuration || 0);
     const position = Number(state.position || 0);
 
-    spotifyLastUpdateAt = Date.now();
+    spotifyLastUpdateAt = now;
     spotifyLastPaused = state.isPaused === true;
     spotifyLastBuffering = state.isBuffering === true;
 
@@ -2116,28 +2230,48 @@ function syncSpotifyAutoNextDeadline(state = null) {
     !autoNextEnabled ||
     currentSource !== "spotify" ||
     spotifyPlaybackMode !== "full" ||
+    spotifyInterstitialActive ||
     !spotifyHasStarted ||
-    spotifyLastPaused ||
-    spotifyLastBuffering ||
     spotifyLastDuration <= 31000
   ) {
     spotifyExpectedEndAt = 0;
+    scheduleSpotifyAutoNextDeadlineTimer();
     return;
   }
 
   startSpotifyAutoNextWatchdog();
 
   const elapsedSinceUpdate = spotifyLastUpdateAt
-    ? Math.max(0, Date.now() - spotifyLastUpdateAt)
+    ? Math.max(0, now - spotifyLastUpdateAt)
     : 0;
-  const estimatedPosition = Math.min(
-    spotifyLastDuration,
-    spotifyLastPosition + elapsedSinceUpdate
-  );
+  const estimatedPosition = spotifyLastPaused
+    ? spotifyLastPosition
+    : Math.min(spotifyLastDuration, spotifyLastPosition + elapsedSinceUpdate);
   const remaining = Math.max(0, spotifyLastDuration - estimatedPosition);
 
-  // Small cushion avoids changing tracks a fraction of a second before Spotify finishes.
-  spotifyExpectedEndAt = Date.now() + remaining + 450;
+  if (spotifyLastBuffering) return;
+
+  if (spotifyLastPaused) {
+    // Preserve a near-end deadline when Spotify resets position at natural completion.
+    const msUntilPreviousDeadline = previousDeadline
+      ? previousDeadline - now
+      : Number.POSITIVE_INFINITY;
+
+    if (previousDeadline && msUntilPreviousDeadline <= 4000) {
+      spotifyExpectedEndAt = Math.max(previousDeadline, now + 120);
+      scheduleSpotifyAutoNextDeadlineTimer();
+      return;
+    }
+
+    // An early pause is treated as intentional.
+    spotifyExpectedEndAt = 0;
+    scheduleSpotifyAutoNextDeadlineTimer();
+    return;
+  }
+
+  // Track end time independently from Spotify's final state event.
+  spotifyExpectedEndAt = now + remaining + 250;
+  scheduleSpotifyAutoNextDeadlineTimer();
 }
 
 function destroySpotifyPlayer({ preserveMode = false } = {}) {
@@ -2160,6 +2294,11 @@ function destroySpotifyPlayer({ preserveMode = false } = {}) {
   spotifyEndHandled = false;
   spotifyLastPosition = 0;
   spotifyLastDuration = 0;
+  spotifyCurrentPlayingUri = "";
+  spotifyInterstitialActive = false;
+  spotifySessionHasFullPlayback = false;
+  spotifyShortDurationEvidence = 0;
+  spotifyShortDurationFirstAt = 0;
   spotifyAwaitingSignInRetry = false;
 
   if (!preserveMode) {
@@ -2221,6 +2360,40 @@ function nextSpotifySong(currentId) {
   return null;
 }
 
+function nextYouTubeSong(currentId) {
+  const startIndex = songs.findIndex(song => String(song.id) === String(currentId));
+  if (startIndex < 0) return null;
+
+  for (let index = startIndex + 1; index < songs.length; index++) {
+    const candidate = songs[index];
+    if (getYouTubeVideoId(candidate.youtubeUrl)) return candidate;
+  }
+
+  return null;
+}
+
+function handoffSpotifyBackgroundToYouTube(targetSong = null) {
+  if (
+    !document.hidden ||
+    !autoNextEnabled ||
+    autoNextTransitionLock
+  ) {
+    return false;
+  }
+
+  const nextSong = targetSong || nextYouTubeSong(currentSongId);
+  if (!nextSong || !getYouTubeVideoId(nextSong.youtubeUrl)) return false;
+
+  autoNextTransitionLock = true;
+  playSong(nextSong, "youtube", { backgroundFallback: true });
+
+  window.setTimeout(() => {
+    autoNextTransitionLock = false;
+  }, 650);
+
+  return true;
+}
+
 function syncSpotifyPlaybackStatus(song = null) {
   const activeSong = song || songs.find(item => String(item.id) === String(currentSongId));
   if (!activeSong || currentSource !== "spotify") return;
@@ -2247,7 +2420,7 @@ function spotifyUsesMobileEmbedUx() {
 function openSpotifyForFullPlayback(song = null) {
   const activeSong = song || songs.find(item => String(item.id) === String(currentSongId));
 
-  // Mobile preview mode hands full playback off to Spotify.
+  // Mobile full playback opens the native Spotify destination.
   if (spotifyUsesMobileEmbedUx()) {
     const target = spotifyTrackUrlOnly(activeSong?.spotifyUrl) || "https://open.spotify.com/";
     window.open(target, "_blank", "noopener,noreferrer");
@@ -2299,6 +2472,9 @@ function playNextSpotifySong() {
     return;
   }
 
+  // Hidden tabs continue the archive on YouTube because Spotify iframe autoplay is unreliable there.
+  if (document.hidden && handoffSpotifyBackgroundToYouTube()) return;
+
   const nextSong = nextSpotifySong(currentSongId);
 
   if (!nextSong) {
@@ -2317,8 +2493,16 @@ function playNextSpotifySong() {
   spotifyLastPaused = true;
   spotifyLastBuffering = false;
   spotifyExpectedEndAt = 0;
-  spotifyPlaybackMode = "unknown";
+  spotifyInterstitialActive = false;
+  spotifyShortDurationEvidence = 0;
+  spotifyShortDurationFirstAt = 0;
+  spotifyPlaybackMode = spotifySessionHasFullPlayback ? "full" : "unknown";
   spotifyAwaitingSignInRetry = false;
+  spotifyPendingAutoStartSongId = nextSong.id;
+  spotifyPendingAutoStartUri = spotifyTrackUri(nextSong.spotifyUrl);
+  spotifyPendingEntityReady = false;
+  spotifyPendingLoadRequestedAt = Date.now();
+  spotifyAutoStartAttempts = 0;
 
   setScriptAwareText(playerTitle, nextSong.title);
   setScriptAwareText(playerArtist, nextSong.artist);
@@ -2332,22 +2516,30 @@ function playNextSpotifySong() {
 
   if (spotifyController && spotifyUrl && typeof spotifyController.loadEntity === "function") {
     try {
-      spotifyController.loadEntity(spotifyUrl);
-      setTimeout(() => {
-        try {
-          spotifyController?.play?.();
-        } catch { }
-      }, 120);
+      spotifyController.loadEntity(spotifyPendingAutoStartUri || spotifyUrl);
+      startSpotifyAutoNextWatchdog();
+
+      // Wait for the requested Spotify entity before starting it.
+      setTimeout(tryStartPendingSpotifyTrack, 700);
+      setTimeout(tryStartPendingSpotifyTrack, 1500);
     } catch {
+      spotifyPendingAutoStartSongId = null;
+      spotifyPendingAutoStartUri = "";
+      spotifyPendingEntityReady = false;
+      spotifyPendingLoadRequestedAt = 0;
       playSong(nextSong, "spotify");
     }
   } else {
+    spotifyPendingAutoStartSongId = null;
+    spotifyPendingAutoStartUri = "";
+    spotifyPendingEntityReady = false;
+    spotifyPendingLoadRequestedAt = 0;
     playSong(nextSong, "spotify");
   }
 
   setTimeout(() => {
     autoNextTransitionLock = false;
-  }, 900);
+  }, 650);
 }
 
 async function mountSpotifyPlayer(song) {
@@ -2368,6 +2560,14 @@ async function mountSpotifyPlayer(song) {
   spotifyEndHandled = false;
   spotifyLastPosition = 0;
   spotifyLastDuration = 0;
+  spotifyCurrentPlayingUri = "";
+  spotifyInterstitialActive = false;
+  spotifySessionHasFullPlayback = false;
+  spotifyShortDurationEvidence = 0;
+  spotifyShortDurationFirstAt = 0;
+  spotifyPendingAutoStartUri = "";
+  spotifyPendingEntityReady = false;
+  spotifyPendingLoadRequestedAt = 0;
 
   playerStatus.textContent = "LOADING…";
   mediaEmbed.className = "media-embed spotify-mode";
@@ -2411,10 +2611,26 @@ async function mountSpotifyPlayer(song) {
 
         spotifyController = controller;
 
+        const spotifyFrame = mount.querySelector("iframe");
+        if (spotifyFrame) {
+          spotifyFrame.setAttribute(
+            "allow",
+            "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          );
+        }
+
         controller.addListener("ready", () => {
           if (mountToken !== spotifyMountToken || currentSource !== "spotify") return;
 
           playerStatus.textContent = "STARTING…";
+
+          const readyFrame = mount.querySelector("iframe");
+          if (readyFrame) {
+            readyFrame.setAttribute(
+              "allow",
+              "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            );
+          }
 
           try {
             controller.play();
@@ -2433,13 +2649,35 @@ async function mountSpotifyPlayer(song) {
           }, 2800);
         });
 
-        controller.addListener("playback_started", () => {
+        controller.addListener("playback_started", event => {
           if (mountToken !== spotifyMountToken || currentSource !== "spotify") return;
 
+          const startedUri = spotifyPlayingUri(event?.data?.playingURI);
+          const expectedUri = spotifyPendingAutoStartUri || spotifyTrackUri(
+            songs.find(item => String(item.id) === String(currentSongId))?.spotifyUrl || song.spotifyUrl
+          );
+
+          // Foreign URIs are treated as Spotify-controlled interstitial playback.
+          if (startedUri && expectedUri && startedUri !== expectedUri) {
+            spotifyInterstitialActive = true;
+            spotifyExpectedEndAt = 0;
+            scheduleSpotifyAutoNextDeadlineTimer();
+            return;
+          }
+
+          spotifyCurrentPlayingUri = startedUri || expectedUri;
+          spotifyInterstitialActive = false;
           spotifyHasStarted = true;
           spotifyEndHandled = false;
           spotifyLastPaused = false;
           spotifyLastBuffering = false;
+          spotifyPendingAutoStartSongId = null;
+          spotifyPendingAutoStartUri = "";
+          spotifyPendingEntityReady = false;
+          spotifyPendingLoadRequestedAt = 0;
+          spotifyAutoStartAttempts = 0;
+          startSpotifyAutoNextWatchdog();
+          syncSpotifyAutoNextDeadline();
 
           if (spotifyAutoplayTimer) {
             clearTimeout(spotifyAutoplayTimer);
@@ -2463,6 +2701,32 @@ async function mountSpotifyPlayer(song) {
           const state = event?.data || {};
           const duration = Number(state.duration || 0);
           const position = Number(state.position || 0);
+          const stateUri = spotifyPlayingUri(state.playingURI);
+          const expectedUri = spotifyPendingAutoStartUri || spotifyTrackUri(
+            songs.find(item => String(item.id) === String(currentSongId))?.spotifyUrl || song.spotifyUrl
+          );
+
+          // Ignore archive automation while Spotify is playing a foreign URI.
+          if (stateUri && expectedUri && stateUri !== expectedUri) {
+            spotifyInterstitialActive = true;
+            spotifyExpectedEndAt = 0;
+            scheduleSpotifyAutoNextDeadlineTimer();
+            return;
+          }
+
+          if (spotifyInterstitialActive && (!stateUri || stateUri === expectedUri)) {
+            spotifyInterstitialActive = false;
+            spotifyEndHandled = false;
+          }
+
+          if (
+            spotifyPendingAutoStartSongId &&
+            spotifyPendingAutoStartUri &&
+            stateUri === spotifyPendingAutoStartUri
+          ) {
+            spotifyPendingEntityReady = true;
+            if (state.isPaused === true) tryStartPendingSpotifyTrack();
+          }
 
           spotifyLastUpdateAt = Date.now();
           spotifyLastPaused = state.isPaused === true;
@@ -2470,9 +2734,38 @@ async function mountSpotifyPlayer(song) {
           if (duration > 0) spotifyLastDuration = duration;
           if (position >= 0) spotifyLastPosition = Math.max(0, position);
 
+          if (stateUri && state.isPaused === false) {
+            spotifyCurrentPlayingUri = stateUri;
+            if (spotifyPendingAutoStartUri === stateUri) {
+              spotifyHasStarted = true;
+              spotifyPendingAutoStartSongId = null;
+              spotifyPendingAutoStartUri = "";
+              spotifyPendingEntityReady = false;
+              spotifyPendingLoadRequestedAt = 0;
+              spotifyAutoStartAttempts = 0;
+            }
+          }
+
           if (duration > 0 && duration <= 31000) {
             spotifyExpectedEndAt = 0;
-            if (spotifyPlaybackMode !== "preview") {
+            scheduleSpotifyAutoNextDeadlineTimer();
+
+            // Do not downgrade confirmed full playback because of a later short segment.
+            if (spotifySessionHasFullPlayback) {
+              spotifyInterstitialActive = true;
+              return;
+            }
+
+            const now = Date.now();
+            if (!spotifyShortDurationFirstAt) spotifyShortDurationFirstAt = now;
+            spotifyShortDurationEvidence += 1;
+
+            // Require stable short-duration evidence before declaring preview mode.
+            if (
+              spotifyShortDurationEvidence >= 3 &&
+              now - spotifyShortDurationFirstAt >= 650 &&
+              spotifyPlaybackMode !== "preview"
+            ) {
               spotifyPlaybackMode = "preview";
               const activeSong =
                 songs.find(item => String(item.id) === String(currentSongId)) || song;
@@ -2486,12 +2779,19 @@ async function mountSpotifyPlayer(song) {
             return;
           }
 
-          if (duration > 31000 && spotifyPlaybackMode !== "full") {
-            spotifyPlaybackMode = "full";
-            spotifyAwaitingSignInRetry = false;
-            syncSpotifyPlaybackStatus(
-              songs.find(item => String(item.id) === String(currentSongId)) || song
-            );
+          if (duration > 31000) {
+            spotifySessionHasFullPlayback = true;
+            spotifyInterstitialActive = false;
+            spotifyShortDurationEvidence = 0;
+            spotifyShortDurationFirstAt = 0;
+
+            if (spotifyPlaybackMode !== "full") {
+              spotifyPlaybackMode = "full";
+              spotifyAwaitingSignInRetry = false;
+              syncSpotifyPlaybackStatus(
+                songs.find(item => String(item.id) === String(currentSongId)) || song
+              );
+            }
           }
 
           if (duration > 31000) {
@@ -2501,15 +2801,23 @@ async function mountSpotifyPlayer(song) {
           if (
             spotifyPlaybackMode === "full" &&
             spotifyHasStarted &&
+            !spotifyInterstitialActive &&
             autoNextEnabled &&
             !spotifyEndHandled &&
             !autoNextTransitionLock &&
             state.isPaused === true &&
             spotifyLastDuration > 31000 &&
-            Math.max(position, spotifyLastPosition) >= spotifyLastDuration - 1200
+            (
+              Math.max(position, spotifyLastPosition) >= spotifyLastDuration - 1200 ||
+              (spotifyExpectedEndAt && Date.now() >= spotifyExpectedEndAt - 900)
+            )
           ) {
             spotifyEndHandled = true;
             spotifyExpectedEndAt = 0;
+            if (spotifyAutoNextDeadlineTimer) {
+              clearTimeout(spotifyAutoNextDeadlineTimer);
+              spotifyAutoNextDeadlineTimer = null;
+            }
             playNextSpotifySong();
           }
         });
@@ -2624,7 +2932,7 @@ function playNextSong() {
   if (preferredSource === "youtube") {
     const nextVideoId = getYouTubeVideoId(nextSong.youtubeUrl);
 
-    // Reuse the player to preserve background autoplay.
+    // Reuse the active YouTube player to preserve continuous playback.
     if (
       youtubePlayer &&
       nextVideoId &&
@@ -2643,7 +2951,9 @@ function playNextSong() {
       try {
         youtubePlayer.loadVideoById(nextVideoId);
       } catch {
-        playSong(nextSong, preferredSource);
+        playSong(nextSong, preferredSource, {
+          backgroundFallback: backgroundYoutubeFallbackActive
+        });
       } finally {
         setTimeout(() => {
           autoNextTransitionLock = false;
@@ -2655,7 +2965,10 @@ function playNextSong() {
 
   if (preferredSource) {
     // Briefly debounce duplicate ENDED events.
-    playSong(nextSong, preferredSource);
+    playSong(nextSong, preferredSource, {
+      backgroundFallback:
+        backgroundYoutubeFallbackActive && preferredSource === "youtube"
+    });
     setTimeout(() => {
       autoNextTransitionLock = false;
     }, 500);
@@ -2726,7 +3039,7 @@ async function mountYouTubePlayer(song, videoId, startSeconds = 0) {
           clearInterval(youtubePlaybackMonitor);
           youtubePlaybackWorker?.terminate?.();
 
-          // Use a worker tick to reduce background-tab timer throttling.
+          // Worker ticks keep queue checks responsive in background tabs.
           try {
             youtubePlaybackWorker = new Worker(
               URL.createObjectURL(
@@ -3956,7 +4269,7 @@ form.addEventListener("submit", async event => {
         created_by: currentUser.id
       })
       .select(
-        "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
+        "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
       )
       .single();
 
@@ -4095,6 +4408,23 @@ function spotifyTrackUrlOnly(url) {
   } catch {
     return "";
   }
+}
+
+function spotifyTrackUri(urlOrUri) {
+  const value = String(urlOrUri || "").trim();
+  const uriMatch = value.match(/^spotify:track:([A-Za-z0-9]+)$/i);
+  if (uriMatch) return `spotify:track:${uriMatch[1]}`;
+
+  const trackUrl = spotifyTrackUrlOnly(value);
+  if (!trackUrl) return "";
+  const id = trackUrl.split("/").pop();
+  return id ? `spotify:track:${id}` : "";
+}
+
+function spotifyPlayingUri(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return spotifyTrackUri(raw) || raw;
 }
 
 function normalizeSpotifyMatchText(value) {
@@ -4246,9 +4576,12 @@ function formatYouTubeApiError(error) {
   return "YOUTUBE AUTO-FETCH FAILED · SONG CAN STILL BE SAVED";
 }
 
-function playSong(song, requestedSource = null) {
+function playSong(song, requestedSource = null, options = {}) {
   const youtubeId = getYouTubeVideoId(song.youtubeUrl);
   const spotifyEmbedUrl = getSpotifyEmbedUrl(song.spotifyUrl);
+  const backgroundFallback = options?.backgroundFallback === true;
+
+  backgroundYoutubeFallbackActive = backgroundFallback;
 
   const source = requestedSource || (youtubeId ? "youtube" : spotifyEmbedUrl ? "spotify" : null);
 
@@ -4361,7 +4694,8 @@ function renderSourceTabs(song, activeSource) {
     if (mobileSpotifyPreview) {
       sources.push({
         key: "spotify-open",
-        label: "OPEN ↗",
+        label: "OPEN",
+        icon: "external",
         pending: false,
         externalSpotifyAction: true
       });
@@ -4383,7 +4717,25 @@ function renderSourceTabs(song, activeSource) {
 
     const label = document.createElement("span");
     label.className = "source-tab-label";
-    label.textContent = source.label;
+    label.append(document.createTextNode(source.label));
+
+    if (source.icon === "external") {
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.classList.add("source-tab-icon");
+      icon.setAttribute("viewBox", "0 0 12 12");
+      icon.setAttribute("aria-hidden", "true");
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M4 2h6v6M10 2 2 10");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "1.45");
+      path.setAttribute("stroke-linecap", "square");
+      path.setAttribute("stroke-linejoin", "miter");
+      icon.appendChild(path);
+      label.appendChild(icon);
+    }
+
     button.appendChild(label);
 
     if (source.pending) {
@@ -5521,7 +5873,7 @@ function timelineClusterTooltip(cluster) {
 
   return `<strong>${heading}</strong>` +
     songLines +
-    `<small>${senderLabel(cluster.songs[0])}</small>`;
+    `<small>${escapeHtml(senderLabel(cluster.songs[0]))}</small>`;
 }
 
 function bindTimelineClusterPreview(element, cluster) {
@@ -5850,7 +6202,7 @@ function renderTimeline(stats) {
       dot.dataset.tooltip =
         `<strong>${scriptAwareHtml(firstSong.title)}</strong>` +
         `<span>${scriptAwareHtml(firstSong.artist)}</span>` +
-        `<small>${senderLabel(firstSong)} · ${shortDate(firstSong.createdAt)}</small>`;
+        `<small>${escapeHtml(senderLabel(firstSong))} · ${shortDate(firstSong.createdAt)}</small>`;
       bindTooltip(dot, true);
     } else {
       dot.setAttribute(
@@ -5986,7 +6338,14 @@ function renderWeirdFacts(stats) {
   facts.slice(0, 5).forEach((fact, index) => {
     const row = document.createElement("div");
     row.className = "weird-fact";
-    row.innerHTML = `<span>${String(index + 1).padStart(2, "0")}</span><p>${fact}</p>`;
+
+    const number = document.createElement("span");
+    number.textContent = String(index + 1).padStart(2, "0");
+
+    const copy = document.createElement("p");
+    copy.textContent = fact;
+
+    row.append(number, copy);
     weirdFacts.appendChild(row);
   });
 }
