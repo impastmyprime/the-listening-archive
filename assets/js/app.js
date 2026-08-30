@@ -89,6 +89,10 @@ let realtimeChannel = null;
 let songReadStateReady = false;
 let readSongIdsForCurrentPerson = new Set();
 const pendingSongReadIds = new Set();
+// Track background media enrichment independently from song objects.
+// Realtime Supabase reloads remap rows into fresh objects, so an object-only
+// `mediaLookupPending` flag can disappear before YouTube/Spotify finishes.
+const pendingMediaLookupIds = new Set();
 
 const PIXEL_COLS = 40;
 const PIXEL_ROWS = 20;
@@ -3087,10 +3091,12 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
   const shouldFindYouTube = !youtubeUrl;
   const shouldFindSpotify = !spotifyUrl;
   const tasks = [];
+  const songId = String(song?.id || "");
 
-  // Keep a local pending flag so a newly inserted song says FINDING LINK…
-  // instead of incorrectly saying NO PLAYABLE LINK while enrichment runs.
+  // Keep pending state outside the song object. Supabase realtime replaces song
+  // objects after INSERT/UPDATE events, but the ID survives those remaps.
   song.mediaLookupPending = shouldFindYouTube || shouldFindSpotify;
+  if (song.mediaLookupPending && songId) pendingMediaLookupIds.add(songId);
   renderSongs();
 
   if (shouldFindYouTube) {
@@ -3171,6 +3177,7 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
   // as it resolves instead of waiting for the slower lookup to finish.
   await Promise.allSettled(tasks);
   song.mediaLookupPending = false;
+  if (songId) pendingMediaLookupIds.delete(songId);
   renderSongs();
 
   return song;
@@ -3266,6 +3273,9 @@ form.addEventListener("submit", async event => {
     if (inserted) {
       newSong = mapRemoteSong(inserted);
       newSong.mediaLookupPending = !youtubeUrl || !spotifyUrl;
+      if (newSong.mediaLookupPending && newSong.id) {
+        pendingMediaLookupIds.add(String(newSong.id));
+      }
       songs.unshift(newSong);
       renderSongs();
     } else {
@@ -3706,6 +3716,23 @@ function closePlayer() {
   syncPlayButtons();
 }
 
+function isSongMediaLookupPending(song) {
+  if (!song) return false;
+
+  const songId = String(song.id || "");
+  if (songId && pendingMediaLookupIds.has(songId)) return true;
+  if (song.mediaLookupPending) return true;
+
+  // Persisted fallback: the initial fast insert writes spotify_status=pending.
+  // This covers the realtime race where Supabase remaps the row before the
+  // local background task has attached its ID-based pending state.
+  const hasPlayableLink =
+    Boolean(getYouTubeVideoId(song.youtubeUrl)) ||
+    Boolean(getSpotifyEmbedUrl(song.spotifyUrl));
+
+  return !hasPlayableLink && String(song.spotifyStatus || "").toLowerCase() === "pending";
+}
+
 function setPlayButtonContent(button, state = "idle") {
   if (!button) return;
 
@@ -4044,7 +4071,7 @@ function renderSongs() {
       });
       setPlayButtonContent(playButton, "idle");
       const preferredUrl = canYouTube ? song.youtubeUrl : song.spotifyUrl;
-    } else if (song.mediaLookupPending) {
+    } else if (isSongMediaLookupPending(song)) {
       playButton.disabled = true;
       setPlayButtonContent(playButton, "pending");
     } else {
