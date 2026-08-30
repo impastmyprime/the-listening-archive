@@ -3040,6 +3040,127 @@ dialog.addEventListener("click", event => {
   if (clickedOutside) dialog.close();
 });
 
+async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "", spotifyUrl = "" }) {
+  const shouldFindYouTube = !youtubeUrl;
+  const shouldFindSpotify = !spotifyUrl;
+
+  // YouTube and Spotify are independent lookups, so run them at the same time.
+  const [youtubeResult, spotifyResult] = await Promise.allSettled([
+    shouldFindYouTube
+      ? findYouTubeSong(title, artist)
+      : Promise.resolve(null),
+    shouldFindSpotify
+      ? findSpotifySong(title, artist)
+      : Promise.resolve(null)
+  ]);
+
+  const patch = {};
+
+  if (shouldFindYouTube) {
+    if (youtubeResult.status === "fulfilled") {
+      const match = youtubeResult.value;
+      if (match?.url) {
+        patch.youtube_url = match.url;
+      }
+    } else {
+      console.error("Background YouTube auto-fetch failed:", youtubeResult.reason);
+    }
+  }
+
+  if (shouldFindSpotify) {
+    patch.spotify_lookup_at = new Date().toISOString();
+
+    if (spotifyResult.status === "fulfilled") {
+      const result = spotifyResult.value;
+      const match = result?.match;
+
+      if (match?.url) {
+        patch.spotify_url = match.url;
+        patch.spotify_status = "found";
+        patch.spotify_lookup_source =
+          match.source ||
+          result.source ||
+          "AUTO";
+        patch.spotify_title =
+          match.spotify_title ||
+          match.title ||
+          null;
+        patch.spotify_artist =
+          match.spotify_artist ||
+          match.artist ||
+          null;
+        patch.spotify_isrc = match.isrc || null;
+        patch.spotify_match_confidence = Number.isFinite(Number(match.confidence))
+          ? Number(match.confidence)
+          : null;
+      } else {
+        patch.spotify_status =
+          result?.status === "error"
+            ? "error"
+            : "not_found";
+        patch.spotify_lookup_source =
+          result?.source ||
+          "ALL_RESOLVERS_EXHAUSTED";
+      }
+    } else {
+      console.error("Background Spotify auto-fetch failed:", spotifyResult.reason);
+      patch.spotify_status = "error";
+      patch.spotify_lookup_source = "FUNCTION_ERROR";
+    }
+  }
+
+  if (Object.keys(patch).length) {
+    const { data: updated, error } = await supabaseClient
+      .from("songs")
+      .update(patch)
+      .eq("id", song.id)
+      .select(
+        "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
+      )
+      .single();
+
+    if (error) throw error;
+
+    if (updated) {
+      // Only mutate media fields here so a simultaneous album resolver cannot
+      // have its local metadata overwritten by this response.
+      song.youtubeUrl = String(updated.youtube_url || "");
+      song.spotifyUrl = String(updated.spotify_url || "");
+      song.spotifyStatus = String(updated.spotify_status || "");
+      song.spotifyLookupSource = String(updated.spotify_lookup_source || "");
+      song.spotifyLookupAt = updated.spotify_lookup_at || null;
+      song.spotifyTitle = String(updated.spotify_title || "");
+      song.spotifyArtist = String(updated.spotify_artist || "");
+      song.spotifyIsrc = String(updated.spotify_isrc || "");
+      song.spotifyMatchConfidence = updated.spotify_match_confidence ?? null;
+      renderSongs();
+    }
+  }
+
+  return song;
+}
+
+async function enrichNewSongInBackground(song, options) {
+  try {
+    // Media enrichment is the expensive part. It is no longer blocking Add Song,
+    // and YouTube + Spotify are fetched concurrently inside this function.
+    await enrichSongMediaInBackground(song, options);
+
+    // Album resolution stays in the background too, but runs after media lookup
+    // so it can benefit from newly discovered YouTube/Spotify identifiers.
+    const resolvedAlbum = await resolveAlbumMetadataViaSupabase(
+      [song],
+      { limit: 1 }
+    );
+
+    if (resolvedAlbum) {
+      renderSongs();
+    }
+  } catch (error) {
+    console.warn(`Background enrichment failed for song ${song?.id || "unknown"}:`, error);
+  }
+}
+
 form.addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -3051,133 +3172,34 @@ form.addEventListener("submit", async event => {
   const data = new FormData(form);
   const title = String(data.get("title") || "").trim();
   const artist = String(data.get("artist") || "").trim();
-  let youtubeUrl = String(data.get("youtubeUrl") || "").trim();
-  let spotifyUrl = String(data.get("spotifyUrl") || "").trim();
+  const youtubeUrl = String(data.get("youtubeUrl") || "").trim();
+  const spotifyUrl = String(data.get("spotifyUrl") || "").trim();
   const note = String(data.get("note") || "").trim();
-
-  let spotifyStatus = spotifyUrl ? "manual" : "pending";
-  let spotifyLookupSource = spotifyUrl ? "MANUAL" : null;
-  let spotifyTitle = null;
-  let spotifyArtist = null;
-  let spotifyIsrc = null;
-  let spotifyMatchConfidence = null;
 
   if (!title || !artist) return;
 
+  const spotifyStatus = spotifyUrl ? "manual" : "pending";
+  const spotifyLookupSource = spotifyUrl ? "MANUAL" : null;
+  const now = new Date().toISOString();
+
   submitSongButton.disabled = true;
-  submitSongButton.textContent = "ADDING…";
+  submitSongButton.textContent = "SAVING…";
+
+  if (youtubeUrl) {
+    setYouTubeAutoStatus("MANUAL YOUTUBE LINK USED", "found");
+  } else {
+    setYouTubeAutoStatus("AUTO-FETCH WILL CONTINUE IN BACKGROUND");
+  }
+
+  if (spotifyUrl) {
+    setSpotifyAutoStatus("MANUAL SPOTIFY LINK USED", "found");
+  } else {
+    setSpotifyAutoStatus("AUTO-FETCH WILL CONTINUE IN BACKGROUND");
+  }
 
   try {
-    if (!youtubeUrl) {
-      submitSongButton.textContent = "FINDING YOUTUBE…";
-
-      setYouTubeAutoStatus(
-        `SEARCHING YOUTUBE · ${artist.toUpperCase()} — ${title.toUpperCase()}`
-      );
-
-      try {
-        const match = await findYouTubeSong(title, artist);
-
-        if (match?.url) {
-          youtubeUrl = match.url;
-          youtubeUrlInput.value = youtubeUrl;
-
-          setYouTubeAutoStatus(
-            `FOUND · ${String(match.channel || "YOUTUBE").toUpperCase()} · ${String(match.title || title).toUpperCase()}`,
-            "found"
-          );
-        } else {
-          setYouTubeAutoStatus(
-            "NO EMBEDDABLE YOUTUBE MATCH FOUND · SONG WILL STILL BE SAVED",
-            "error"
-          );
-        }
-      } catch (error) {
-        console.error("YouTube auto-fetch failed:", error);
-        setYouTubeAutoStatus(
-          formatYouTubeApiError(error),
-          "error"
-        );
-      }
-    } else {
-      setYouTubeAutoStatus("MANUAL YOUTUBE LINK USED", "found");
-    }
-
-    if (!spotifyUrl) {
-      submitSongButton.textContent = "FINDING SPOTIFY…";
-
-      setSpotifyAutoStatus(
-        `SEARCHING SPOTIFY · ${artist.toUpperCase()} — ${title.toUpperCase()}`
-      );
-
-      try {
-        const result = await findSpotifySong(title, artist);
-        const match = result?.match;
-
-        if (match?.url) {
-          spotifyUrl = match.url;
-          spotifyUrlInput.value = spotifyUrl;
-
-          spotifyStatus = "found";
-          spotifyLookupSource =
-            match.source ||
-            result.source ||
-            "AUTO";
-
-          spotifyTitle =
-            match.spotify_title ||
-            match.title ||
-            null;
-
-          spotifyArtist =
-            match.spotify_artist ||
-            match.artist ||
-            null;
-
-          spotifyIsrc = match.isrc || null;
-
-          spotifyMatchConfidence = Number.isFinite(
-            Number(match.confidence)
-          )
-            ? Number(match.confidence)
-            : null;
-
-          setSpotifyAutoStatus(
-            `FOUND · ${String(spotifyLookupSource).replaceAll("_", " ")} · ${String(spotifyTitle || title)}`.toUpperCase(),
-            "found"
-          );
-        } else {
-          spotifyStatus =
-            result?.status === "error"
-              ? "error"
-              : "not_found";
-
-          spotifyLookupSource =
-            result?.source ||
-            "ALL_RESOLVERS_EXHAUSTED";
-
-          setSpotifyAutoStatus(
-            "NO VERIFIED SPOTIFY MATCH FOUND · SONG WILL STILL BE SAVED",
-            "error"
-          );
-        }
-      } catch (error) {
-        console.error("Spotify auto-fetch failed:", error);
-        spotifyStatus = "error";
-        spotifyLookupSource = "FUNCTION_ERROR";
-        setSpotifyAutoStatus(
-          formatSpotifyApiError(error),
-          "error"
-        );
-      }
-    } else {
-      spotifyStatus = "manual";
-      spotifyLookupSource = "MANUAL";
-      setSpotifyAutoStatus("MANUAL SPOTIFY LINK USED", "found");
-    }
-
-    submitSongButton.textContent = "SAVING…";
-
+    // Save the human-entered content immediately. Media links are enrichment,
+    // not a prerequisite for adding the song to the shared archive.
     const { data: inserted, error } = await supabaseClient
       .from("songs")
       .insert({
@@ -3187,11 +3209,11 @@ form.addEventListener("submit", async event => {
         spotify_url: spotifyUrl || null,
         spotify_status: spotifyStatus,
         spotify_lookup_source: spotifyLookupSource,
-        spotify_lookup_at: new Date().toISOString(),
-        spotify_title: spotifyTitle,
-        spotify_artist: spotifyArtist,
-        spotify_isrc: spotifyIsrc,
-        spotify_match_confidence: spotifyMatchConfidence,
+        spotify_lookup_at: spotifyUrl ? now : null,
+        spotify_title: null,
+        spotify_artist: null,
+        spotify_isrc: null,
+        spotify_match_confidence: null,
         note: note || null,
         sender_person: currentPerson,
         created_by: currentUser.id
@@ -3203,23 +3225,19 @@ form.addEventListener("submit", async event => {
 
     if (error) throw error;
 
+    let newSong = null;
+
     if (inserted) {
-      const newSong = mapRemoteSong(inserted);
+      newSong = mapRemoteSong(inserted);
       songs.unshift(newSong);
-      // Persist canonical album metadata through the Supabase resolver.
-      await resolveAlbumMetadataViaSupabase([newSong], { limit: 1 });
       renderSongs();
     } else {
       await loadRemoteSongs();
     }
 
     form.reset();
-    setYouTubeAutoStatus(
-      "OPTIONAL"
-    );
-    setSpotifyAutoStatus(
-      "OPTIONAL · AUTO-FETCH"
-    );
+    setYouTubeAutoStatus("OPTIONAL");
+    setSpotifyAutoStatus("OPTIONAL · AUTO-FETCH");
 
     currentFilter = "all";
     document
@@ -3231,8 +3249,18 @@ form.addEventListener("submit", async event => {
 
     renderSongs();
 
-    await delay(260);
+    // No artificial delay: the modal closes as soon as Supabase confirms insert.
     dialog.close();
+
+    // Do not await this. The song is already saved and visible.
+    if (newSong) {
+      void enrichNewSongInBackground(newSong, {
+        title,
+        artist,
+        youtubeUrl,
+        spotifyUrl
+      });
+    }
   } catch (error) {
     console.error("Could not save song:", error);
     alert(`Could not save this song: ${error.message}`);
