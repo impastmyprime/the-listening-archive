@@ -3040,102 +3040,138 @@ dialog.addEventListener("click", event => {
   if (clickedOutside) dialog.close();
 });
 
+async function updateSongMediaPatch(song, patch) {
+  if (!song?.id || !patch || !Object.keys(patch).length) return;
+
+  const { error } = await supabaseClient
+    .from("songs")
+    .update(patch)
+    .eq("id", song.id);
+
+  if (error) throw error;
+
+  // Apply only the fields this request actually changed. This avoids one
+  // concurrent media lookup overwriting a newer result from the other source.
+  if (Object.prototype.hasOwnProperty.call(patch, "youtube_url")) {
+    song.youtubeUrl = String(patch.youtube_url || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_url")) {
+    song.spotifyUrl = String(patch.spotify_url || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_status")) {
+    song.spotifyStatus = String(patch.spotify_status || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_source")) {
+    song.spotifyLookupSource = String(patch.spotify_lookup_source || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_at")) {
+    song.spotifyLookupAt = patch.spotify_lookup_at || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_title")) {
+    song.spotifyTitle = String(patch.spotify_title || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_artist")) {
+    song.spotifyArtist = String(patch.spotify_artist || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_isrc")) {
+    song.spotifyIsrc = String(patch.spotify_isrc || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_match_confidence")) {
+    song.spotifyMatchConfidence = patch.spotify_match_confidence ?? null;
+  }
+
+  renderSongs();
+}
+
 async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "", spotifyUrl = "" }) {
   const shouldFindYouTube = !youtubeUrl;
   const shouldFindSpotify = !spotifyUrl;
+  const tasks = [];
 
-  // YouTube and Spotify are independent lookups, so run them at the same time.
-  const [youtubeResult, spotifyResult] = await Promise.allSettled([
-    shouldFindYouTube
-      ? findYouTubeSong(title, artist)
-      : Promise.resolve(null),
-    shouldFindSpotify
-      ? findSpotifySong(title, artist)
-      : Promise.resolve(null)
-  ]);
-
-  const patch = {};
+  // Keep a local pending flag so a newly inserted song says FINDING LINK…
+  // instead of incorrectly saying NO PLAYABLE LINK while enrichment runs.
+  song.mediaLookupPending = shouldFindYouTube || shouldFindSpotify;
+  renderSongs();
 
   if (shouldFindYouTube) {
-    if (youtubeResult.status === "fulfilled") {
-      const match = youtubeResult.value;
-      if (match?.url) {
-        patch.youtube_url = match.url;
+    tasks.push((async () => {
+      try {
+        const match = await findYouTubeSong(title, artist);
+        if (match?.url) {
+          // Update immediately. Do not wait for Spotify if YouTube finishes first.
+          await updateSongMediaPatch(song, {
+            youtube_url: match.url
+          });
+        }
+      } catch (error) {
+        console.error("Background YouTube auto-fetch failed:", error);
       }
-    } else {
-      console.error("Background YouTube auto-fetch failed:", youtubeResult.reason);
-    }
+    })());
   }
 
   if (shouldFindSpotify) {
-    patch.spotify_lookup_at = new Date().toISOString();
+    tasks.push((async () => {
+      const lookupAt = new Date().toISOString();
 
-    if (spotifyResult.status === "fulfilled") {
-      const result = spotifyResult.value;
-      const match = result?.match;
+      try {
+        const result = await findSpotifySong(title, artist);
+        const match = result?.match;
 
-      if (match?.url) {
-        patch.spotify_url = match.url;
-        patch.spotify_status = "found";
-        patch.spotify_lookup_source =
-          match.source ||
-          result.source ||
-          "AUTO";
-        patch.spotify_title =
-          match.spotify_title ||
-          match.title ||
-          null;
-        patch.spotify_artist =
-          match.spotify_artist ||
-          match.artist ||
-          null;
-        patch.spotify_isrc = match.isrc || null;
-        patch.spotify_match_confidence = Number.isFinite(Number(match.confidence))
-          ? Number(match.confidence)
-          : null;
-      } else {
-        patch.spotify_status =
-          result?.status === "error"
-            ? "error"
-            : "not_found";
-        patch.spotify_lookup_source =
-          result?.source ||
-          "ALL_RESOLVERS_EXHAUSTED";
+        if (match?.url) {
+          await updateSongMediaPatch(song, {
+            spotify_url: match.url,
+            spotify_status: "found",
+            spotify_lookup_source:
+              match.source ||
+              result.source ||
+              "AUTO",
+            spotify_lookup_at: lookupAt,
+            spotify_title:
+              match.spotify_title ||
+              match.title ||
+              null,
+            spotify_artist:
+              match.spotify_artist ||
+              match.artist ||
+              null,
+            spotify_isrc: match.isrc || null,
+            spotify_match_confidence: Number.isFinite(Number(match.confidence))
+              ? Number(match.confidence)
+              : null
+          });
+        } else {
+          await updateSongMediaPatch(song, {
+            spotify_status:
+              result?.status === "error"
+                ? "error"
+                : "not_found",
+            spotify_lookup_source:
+              result?.source ||
+              "ALL_RESOLVERS_EXHAUSTED",
+            spotify_lookup_at: lookupAt
+          });
+        }
+      } catch (error) {
+        console.error("Background Spotify auto-fetch failed:", error);
+
+        try {
+          await updateSongMediaPatch(song, {
+            spotify_status: "error",
+            spotify_lookup_source: "FUNCTION_ERROR",
+            spotify_lookup_at: lookupAt
+          });
+        } catch (updateError) {
+          console.error("Could not save Spotify lookup error state:", updateError);
+        }
       }
-    } else {
-      console.error("Background Spotify auto-fetch failed:", spotifyResult.reason);
-      patch.spotify_status = "error";
-      patch.spotify_lookup_source = "FUNCTION_ERROR";
-    }
+    })());
   }
 
-  if (Object.keys(patch).length) {
-    const { data: updated, error } = await supabaseClient
-      .from("songs")
-      .update(patch)
-      .eq("id", song.id)
-      .select(
-        "id,title,artist,youtube_url,spotify_url,spotify_status,spotify_lookup_source,spotify_lookup_at,spotify_title,spotify_artist,spotify_isrc,spotify_match_confidence,note,sender_person,created_by,created_at,album_name,album_artist,album_artwork_url,album_source,album_key,release_type,spotify_album_id,bandcamp_url,album_external_url,album_match_confidence,album_resolution_status,album_locked,album_resolved_at"
-      )
-      .single();
-
-    if (error) throw error;
-
-    if (updated) {
-      // Only mutate media fields here so a simultaneous album resolver cannot
-      // have its local metadata overwritten by this response.
-      song.youtubeUrl = String(updated.youtube_url || "");
-      song.spotifyUrl = String(updated.spotify_url || "");
-      song.spotifyStatus = String(updated.spotify_status || "");
-      song.spotifyLookupSource = String(updated.spotify_lookup_source || "");
-      song.spotifyLookupAt = updated.spotify_lookup_at || null;
-      song.spotifyTitle = String(updated.spotify_title || "");
-      song.spotifyArtist = String(updated.spotify_artist || "");
-      song.spotifyIsrc = String(updated.spotify_isrc || "");
-      song.spotifyMatchConfidence = updated.spotify_match_confidence ?? null;
-      renderSongs();
-    }
-  }
+  // Both lookups still start together, but each source updates the row as soon
+  // as it resolves instead of waiting for the slower lookup to finish.
+  await Promise.allSettled(tasks);
+  song.mediaLookupPending = false;
+  renderSongs();
 
   return song;
 }
@@ -3229,6 +3265,7 @@ form.addEventListener("submit", async event => {
 
     if (inserted) {
       newSong = mapRemoteSong(inserted);
+      newSong.mediaLookupPending = !youtubeUrl || !spotifyUrl;
       songs.unshift(newSong);
       renderSongs();
     } else {
@@ -3503,12 +3540,18 @@ function formatYouTubeApiError(error) {
 }
 
 function playSong(song, requestedSource = null) {
-  void markSongRead(song);
-
   const youtubeId = getYouTubeVideoId(song.youtubeUrl);
   const spotifyEmbedUrl = getSpotifyEmbedUrl(song.spotifyUrl);
 
   const source = requestedSource || (youtubeId ? "youtube" : spotifyEmbedUrl ? "spotify" : null);
+
+  // A just-added song may still be resolving YouTube/Spotify in the background.
+  // Do not open the player with a misleading NO EMBEDDABLE SOURCE error.
+  if (!source && song?.mediaLookupPending) {
+    return;
+  }
+
+  void markSongRead(song);
 
   currentSongId = song.id;
   revealPlayer(song);
@@ -3665,6 +3708,11 @@ function closePlayer() {
 
 function setPlayButtonContent(button, state = "idle") {
   if (!button) return;
+
+  if (state === "pending") {
+    button.innerHTML = `<span>FINDING LINK…</span>`;
+    return;
+  }
 
   if (state === "disabled") {
     button.innerHTML = `<span>NO PLAYABLE LINK</span>`;
@@ -3996,6 +4044,9 @@ function renderSongs() {
       });
       setPlayButtonContent(playButton, "idle");
       const preferredUrl = canYouTube ? song.youtubeUrl : song.spotifyUrl;
+    } else if (song.mediaLookupPending) {
+      playButton.disabled = true;
+      setPlayButtonContent(playButton, "pending");
     } else {
       playButton.disabled = true;
       setPlayButtonContent(playButton, "disabled");
