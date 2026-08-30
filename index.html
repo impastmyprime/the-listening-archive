@@ -11,20 +11,66 @@
   <meta content="#5f7cff" name="theme-color" />
   <meta content="strict-origin-when-cross-origin" name="referrer" />
   <title>The Listening Archive</title>
+  <script>
+    document.documentElement.classList.add("archive-startup-loading");
+    window.__archiveStartupLoaderStartedAt = performance.now();
+  </script>
   <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg?v=90" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png?v=90" />
   <link rel="icon" type="image/png" sizes="48x48" href="assets/images/favicon-48.png?v=90" />
   <link rel="shortcut icon" href="assets/images/favicon.ico?v=90" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/images/apple-touch-icon.png?v=90" />
   <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://cdn.jsdelivr.net" rel="preconnect" crossorigin />
+  <link href="https://nyktfobukaqunyqxasvt.supabase.co" rel="preconnect" crossorigin />
   <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="assets/css/styles.css?h=per-source-pending-player-tabs-20260830" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=102" />
 </head>
 
 <body class="access-checking">
+  <div class="archive-startup-loader" aria-hidden="true">
+    <div class="archive-loader-visual">
+      <span class="archive-loader-ring archive-loader-ring-a"></span>
+      <span class="archive-loader-ring archive-loader-ring-b"></span>
+      <img class="archive-loader-cat" src="assets/cursors/cat.svg?v=101" alt="" draggable="false" />
+    </div>
+    <div class="archive-loader-eq" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="archive-loader-typewriter" aria-label="Indexing tracks">
+      <span id="archiveLoaderTypedText" data-text="INDEXING TRACKS..."></span><i class="archive-loader-caret" aria-hidden="true"></i>
+    </div>
+    <div class="archive-loader-scan" aria-hidden="true"><b></b></div>
+  </div>
+  <script>
+    (() => {
+      const typed = document.getElementById("archiveLoaderTypedText");
+      if (!typed || !document.documentElement.classList.contains("archive-startup-loading")) return;
+
+      const fullText = typed.dataset.text || "INDEXING TRACKS...";
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        typed.textContent = fullText;
+        return;
+      }
+
+      let index = 0;
+      const typeNextCharacter = () => {
+        index += 1;
+        typed.textContent = fullText.slice(0, index);
+        if (index >= fullText.length) return;
+
+        const character = fullText[index - 1];
+        const baseDelay = character === "." ? 92 : character === " " ? 36 : 58;
+        const naturalVariation = character === "." || character === " " ? 0 : Math.floor(Math.random() * 18);
+        window.setTimeout(typeNextCharacter, baseDelay + naturalVariation);
+      };
+
+      window.setTimeout(typeNextCharacter, 110);
+    })();
+  </script>
   <div class="custom-cursor" id="customCursor" data-state="default" aria-hidden="true">
     <div class="custom-cursor-layer custom-cursor-default">
       <img class="custom-cursor-cat" src="assets/cursors/cat.svg?v=97" alt="" draggable="false" />
@@ -88,7 +134,7 @@
       </div>
 
       <div class="access-art" aria-hidden="true">
-        <img src="assets/images/access-halftone.png" alt="">
+        <img src="assets/images/access-halftone.webp" width="1510" height="1000" decoding="async" alt="">
       </div>
     </div>
   </section>
@@ -320,8 +366,10 @@
         <span class="player-kicker">NOW PLAYING</span>
         <strong id="playerTitle">—</strong>
         <span id="playerArtist">—</span>
-        <span class="player-status" id="playerStatus">READY</span>
-        <div aria-label="Playback source" class="source-tabs" id="sourceTabs"></div>
+        <div class="player-meta-row">
+          <span class="player-status" id="playerStatus">READY</span>
+          <div aria-label="Playback source" class="source-tabs" id="sourceTabs"></div>
+        </div>
       </div>
       <div class="media-embed" id="mediaEmbed"></div>
       <button aria-label="Close player" class="player-close" id="closePlayer" type="button">×</button>
@@ -380,7 +428,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/app.js?h=per-source-pending-player-tabs-20260830"></script>
+  <script src="assets/js/app.js?v=102"></script>
   <script src="assets/js/mobile-title-gap.js?h=908c165869"></script>
 
 </body>

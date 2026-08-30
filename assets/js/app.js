@@ -89,13 +89,8 @@ let realtimeChannel = null;
 let songReadStateReady = false;
 let readSongIdsForCurrentPerson = new Set();
 const pendingSongReadIds = new Set();
-// Track background media enrichment independently from song objects.
-// Realtime Supabase reloads remap rows into fresh objects, so an object-only
-// `mediaLookupPending` flag can disappear before YouTube/Spotify finishes.
+// Keep pending media state outside song objects so realtime row replacements cannot erase it.
 const pendingMediaLookupIds = new Set();
-// Track each source independently so the player can show, for example,
-// YOUTUBE while SPOTIFY is still FINDING… and promote each tab as soon as
-// that source finishes resolving.
 const pendingYouTubeLookupIds = new Set();
 const pendingSpotifyLookupIds = new Set();
 
@@ -135,6 +130,26 @@ let currentSongId = null;
 let currentSource = null;
 
 const AUTO_NEXT_STORAGE = "songs-we-sent-auto-next-v1";
+const STARTUP_LOADER_MIN_VISIBLE_MS = 1750;
+
+async function holdStartupLoaderUntilMinimumDuration() {
+  if (!document.documentElement.classList.contains("archive-startup-loading")) return;
+
+  const startedAt = Number(window.__archiveStartupLoaderStartedAt);
+  if (!Number.isFinite(startedAt)) return;
+
+  const elapsed = performance.now() - startedAt;
+  const remaining = Math.max(0, STARTUP_LOADER_MIN_VISIBLE_MS - elapsed);
+
+  if (remaining > 0) {
+    await new Promise(resolve => window.setTimeout(resolve, remaining));
+  }
+}
+
+function finishArchiveStartupLoader() {
+  document.documentElement.classList.remove("archive-startup-loading");
+}
+
 
 // Auto Next resets to enabled on each page load.
 let autoNextEnabled = true;
@@ -148,6 +163,18 @@ let youtubePlaybackMonitor = null;
 let youtubePlaybackWorker = null;
 let autoNextTransitionLock = false;
 let youtubeAutoQueue = [];
+
+let spotifyIframeApiPromise = null;
+let spotifyIframeApi = null;
+let spotifyController = null;
+let spotifyMountToken = 0;
+let spotifyHasStarted = false;
+let spotifyPlaybackMode = "unknown"; // unknown | full | preview | blocked
+let spotifyEndHandled = false;
+let spotifyLastPosition = 0;
+let spotifyLastDuration = 0;
+let spotifyAwaitingSignInRetry = false;
+let spotifyAutoplayTimer = null;
 
 const songList = document.querySelector("#songList");
 const songCount = document.querySelector("#songCount");
@@ -1281,10 +1308,12 @@ async function restoreCurrentMembership() {
   return data;
 }
 
-async function loadSongReadState() {
-  songReadStateReady = false;
-  readSongIdsForCurrentPerson = new Set();
-  pendingSongReadIds.clear();
+async function loadSongReadState({ preserveExisting = false } = {}) {
+  if (!preserveExisting) {
+    songReadStateReady = false;
+    readSongIdsForCurrentPerson = new Set();
+    pendingSongReadIds.clear();
+  }
 
   if (!currentPerson) return;
 
@@ -1302,6 +1331,7 @@ async function loadSongReadState() {
     (data || []).map(row => String(row.song_id))
   );
   songReadStateReady = true;
+  writeCachedReadState();
 }
 
 function isSongNewForCurrentPerson(song) {
@@ -1345,6 +1375,7 @@ async function markSongRead(song) {
 
   pendingSongReadIds.add(songId);
   readSongIdsForCurrentPerson.add(songId);
+  writeCachedReadState();
   removeNewMarkerFromSongDom(songId);
 
   const { error } = await supabaseClient
@@ -1448,6 +1479,98 @@ function mapRemoteSong(row) {
 
 let remoteSongsHaveLoaded = false;
 
+const SONG_SNAPSHOT_CACHE_KEY = "listening-archive-song-snapshot-v1";
+const READ_STATE_CACHE_PREFIX = "listening-archive-read-state-v1";
+
+function readCachedSongSnapshot() {
+  try {
+    const raw = localStorage.getItem(SONG_SNAPSHOT_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(song => song && song.id)
+      .map(song => ({
+        ...song,
+        recommendedBy: song.senderPerson === currentPerson ? "me" : "friend"
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedSongSnapshot(songList) {
+  try {
+    localStorage.setItem(
+      SONG_SNAPSHOT_CACHE_KEY,
+      JSON.stringify((songList || []).slice(0, 500))
+    );
+  } catch { }
+}
+
+function readStateCacheKey(person = currentPerson) {
+  return `${READ_STATE_CACHE_PREFIX}:${String(person || "unknown")}`;
+}
+
+function hydrateCachedReadState() {
+  if (!currentPerson) return false;
+
+  try {
+    const raw = localStorage.getItem(readStateCacheKey());
+    if (!raw) return false;
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids)) return false;
+    readSongIdsForCurrentPerson = new Set(ids.map(String));
+    songReadStateReady = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeCachedReadState() {
+  if (!currentPerson || !songReadStateReady) return;
+  try {
+    localStorage.setItem(
+      readStateCacheKey(),
+      JSON.stringify(Array.from(readSongIdsForCurrentPerson || []).map(String))
+    );
+  } catch { }
+}
+
+function showArchiveLoadingState() {
+  songCount.textContent = "SYNCING…";
+  emptyState.hidden = true;
+  songList.innerHTML = `
+    <div class="archive-loading-row" role="status" aria-live="polite">
+      SYNCING ARCHIVE…
+    </div>`;
+}
+
+function hydrateArchiveSnapshot() {
+  hydrateCachedReadState();
+  const cachedSongs = readCachedSongSnapshot();
+  if (!cachedSongs.length) {
+    showArchiveLoadingState();
+    return false;
+  }
+
+  songs = cachedSongs;
+  remoteSongsHaveLoaded = true;
+  renderSongs();
+  return true;
+}
+
+function scheduleNonCriticalTask(task, timeout = 1200) {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => task(), { timeout });
+  } else {
+    window.setTimeout(task, 40);
+  }
+}
+
 function songDatasetSignature(list = songs) {
   return JSON.stringify((list || []).map(song => [
     String(song.id || ""),
@@ -1512,6 +1635,7 @@ async function loadRemoteSongs({ quiet = false, forceRender = false } = {}) {
 
   const changed = songDatasetSignature(nextSongs) !== songDatasetSignature(songs);
   songs = nextSongs;
+  writeCachedSongSnapshot(nextSongs);
 
   if (!remoteSongsHaveLoaded || changed || forceRender) {
     remoteSongsHaveLoaded = true;
@@ -1610,6 +1734,7 @@ async function unlockArchive(person, people) {
   currentSenderIdentity.textContent =
     currentUserName;
 
+  finishArchiveStartupLoader();
   document.body.classList.remove("access-checking");
   document.body.classList.add("access-granted");
 
@@ -1627,19 +1752,42 @@ async function unlockArchive(person, people) {
 
   refreshPeopleLabels();
 
-  if (["http:", "https:"].includes(window.location.protocol)) {
-    ensureYouTubeApi().catch(() => {});
-  }
+  // Paint cached content first, then refresh it from Supabase.
+  const hadSnapshot = hydrateArchiveSnapshot();
+  const previousReadState = songReadStateSignature();
 
-  await loadSongReadState();
-  await loadRemoteSongs();
-
-  await loadPixelBoard().catch(error => {
-    console.error("Pixel board initialization failed:", error);
-    setPixelBoardStatus("SETUP REQUIRED", "error");
+  const readStatePromise = loadSongReadState({ preserveExisting: hadSnapshot }).catch(error => {
+    console.warn("Read-state refresh failed:", error);
   });
 
-  setupRealtime();
+  const songsPromise = loadRemoteSongs({ quiet: hadSnapshot }).catch(error => {
+    console.error("Archive refresh failed:", error);
+    if (!hadSnapshot) {
+      songList.innerHTML = `
+        <div class="archive-loading-row is-error">
+          ARCHIVE COULD NOT SYNC · REFRESH TO RETRY
+        </div>`;
+    }
+  });
+
+  Promise.allSettled([readStatePromise, songsPromise]).then(() => {
+    if (songReadStateSignature() !== previousReadState) {
+      renderSongs();
+    }
+
+    // Defer realtime until the first core refresh is complete.
+    setupRealtime();
+
+    // Load non-critical pixel data after the archive is usable.
+    scheduleNonCriticalTask(() => {
+      loadPixelBoard().catch(error => {
+        console.error("Pixel board initialization failed:", error);
+        setPixelBoardStatus("SETUP REQUIRED", "error");
+      });
+    });
+  });
+
+  // YouTube is loaded lazily when playback starts.
 }
 
 async function bootstrapSupabase() {
@@ -1658,10 +1806,13 @@ async function bootstrapSupabase() {
 
     if (membership) {
       setAccessStatus("ACCESS RESTORED", "success");
+      await holdStartupLoaderUntilMinimumDuration();
       await unlockArchive(membership.person, membership.people);
       return;
     }
 
+    await holdStartupLoaderUntilMinimumDuration();
+    finishArchiveStartupLoader();
     document.body.classList.add("access-checking");
     document.body.classList.remove("access-granted");
 
@@ -1671,6 +1822,8 @@ async function bootstrapSupabase() {
     accessCodeInput.focus();
   } catch (error) {
     console.error("Supabase bootstrap failed:", error);
+    await holdStartupLoaderUntilMinimumDuration();
+    finishArchiveStartupLoader();
     document.body.classList.add("access-checking");
     document.body.classList.remove("access-granted");
 
@@ -1809,6 +1962,11 @@ autoNextToggle.addEventListener("click", () => {
       }
     }
   }
+
+  if (currentSource === "spotify" && currentSongId) {
+    const currentSong = songs.find(song => String(song.id) === String(currentSongId));
+    if (currentSong) syncSpotifyPlaybackStatus(currentSong);
+  }
 });
 
 backToTop.addEventListener("click", () => {
@@ -1868,6 +2026,384 @@ function ensureYouTubeApi() {
   });
 
   return youtubeApiPromise;
+}
+
+function destroySpotifyPlayer({ preserveMode = false } = {}) {
+  spotifyMountToken++;
+
+  if (spotifyAutoplayTimer) {
+    clearTimeout(spotifyAutoplayTimer);
+    spotifyAutoplayTimer = null;
+  }
+
+  if (spotifyController && typeof spotifyController.destroy === "function") {
+    try {
+      spotifyController.destroy();
+    } catch { }
+  }
+
+  spotifyController = null;
+  spotifyHasStarted = false;
+  spotifyEndHandled = false;
+  spotifyLastPosition = 0;
+  spotifyLastDuration = 0;
+  spotifyAwaitingSignInRetry = false;
+
+  if (!preserveMode) {
+    spotifyPlaybackMode = "unknown";
+  }
+}
+
+function ensureSpotifyIframeApi() {
+  if (spotifyIframeApi?.createController) {
+    return Promise.resolve(spotifyIframeApi);
+  }
+
+  if (spotifyIframeApiPromise) return spotifyIframeApiPromise;
+
+  spotifyIframeApiPromise = new Promise((resolve, reject) => {
+    const previousReady = window.onSpotifyIframeApiReady;
+
+    window.onSpotifyIframeApiReady = IFrameAPI => {
+      try {
+        if (typeof previousReady === "function") previousReady(IFrameAPI);
+      } catch { }
+
+      if (IFrameAPI?.createController) {
+        spotifyIframeApi = IFrameAPI;
+        resolve(IFrameAPI);
+      } else {
+        reject(new Error("Spotify iFrame API loaded without createController."));
+      }
+    };
+
+    const existing = document.querySelector('script[data-spotify-iframe-api="true"]');
+
+    if (!existing) {
+      const script = document.createElement("script");
+      script.src = "https://open.spotify.com/embed/iframe-api/v1";
+      script.async = true;
+      script.dataset.spotifyIframeApi = "true";
+      script.onerror = () => reject(new Error("Could not load Spotify iFrame API."));
+      document.head.appendChild(script);
+    }
+
+    setTimeout(() => {
+      if (spotifyIframeApi?.createController) resolve(spotifyIframeApi);
+    }, 7000);
+  });
+
+  return spotifyIframeApiPromise;
+}
+
+function nextSpotifySong(currentId) {
+  const startIndex = songs.findIndex(song => String(song.id) === String(currentId));
+  if (startIndex < 0) return null;
+
+  for (let index = startIndex + 1; index < songs.length; index++) {
+    const candidate = songs[index];
+    if (spotifyTrackUrlOnly(candidate.spotifyUrl)) return candidate;
+  }
+
+  return null;
+}
+
+function syncSpotifyPlaybackStatus(song = null) {
+  const activeSong = song || songs.find(item => String(item.id) === String(currentSongId));
+  if (!activeSong || currentSource !== "spotify") return;
+
+  if (spotifyPlaybackMode === "preview") {
+    playerStatus.textContent = "PREVIEW";
+  } else if (spotifyPlaybackMode === "full") {
+    playerStatus.textContent = autoNextEnabled ? "AUTO NEXT ON" : "SPOTIFY";
+  } else if (spotifyPlaybackMode === "blocked") {
+    playerStatus.textContent = "PRESS PLAY";
+  } else {
+    playerStatus.textContent = "LOADING…";
+  }
+
+  renderSourceTabs(activeSong, "spotify");
+}
+
+function spotifyUsesMobileEmbedUx() {
+  return window.matchMedia(
+    "(max-width: 768px), (hover: none) and (pointer: coarse)"
+  ).matches;
+}
+
+function openSpotifyForFullPlayback(song = null) {
+  const activeSong = song || songs.find(item => String(item.id) === String(currentSongId));
+
+  // Mobile preview mode hands full playback off to Spotify.
+  if (spotifyUsesMobileEmbedUx()) {
+    const target = spotifyTrackUrlOnly(activeSong?.spotifyUrl) || "https://open.spotify.com/";
+    window.open(target, "_blank", "noopener,noreferrer");
+    spotifyAwaitingSignInRetry = false;
+    playerStatus.textContent = "PREVIEW";
+    if (activeSong) renderSourceTabs(activeSong, "spotify");
+    return;
+  }
+
+  window.open("https://accounts.spotify.com/login", "_blank", "noopener,noreferrer");
+  spotifyAwaitingSignInRetry = true;
+  playerStatus.textContent = "PREVIEW";
+  if (activeSong) renderSourceTabs(activeSong, "spotify");
+}
+
+function renderMobileSpotifyPreviewHandoff(song) {
+  if (!song || !spotifyUsesMobileEmbedUx()) return;
+
+  spotifyPlaybackMode = "preview";
+  playerStatus.textContent = "PREVIEW";
+  renderSourceTabs(song, "spotify");
+}
+
+function mountSpotifyFallbackIframe(song, spotifyEmbedUrl, message = "SPOTIFY · STANDARD PLAYER") {
+  spotifyPlaybackMode = "blocked";
+  playerStatus.textContent = message;
+  mediaEmbed.className = "media-embed spotify-mode";
+  mediaEmbed.innerHTML = "";
+
+  const iframe = document.createElement("iframe");
+  iframe.title = `Spotify player: ${song.title} — ${song.artist}`;
+  iframe.src = spotifyEmbedUrl;
+  iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+  iframe.allowFullscreen = true;
+  iframe.loading = "eager";
+  mediaEmbed.appendChild(iframe);
+
+  renderSourceTabs(song, "spotify");
+}
+
+function playNextSpotifySong() {
+  if (
+    autoNextTransitionLock ||
+    !autoNextEnabled ||
+    currentSource !== "spotify" ||
+    !currentSongId ||
+    spotifyPlaybackMode !== "full"
+  ) {
+    return;
+  }
+
+  const nextSong = nextSpotifySong(currentSongId);
+
+  if (!nextSong) {
+    playerStatus.textContent = "AUTO NEXT · END OF SPOTIFY QUEUE";
+    return;
+  }
+
+  autoNextTransitionLock = true;
+  currentSongId = nextSong.id;
+  currentSource = "spotify";
+  spotifyHasStarted = false;
+  spotifyEndHandled = false;
+  spotifyLastPosition = 0;
+  spotifyLastDuration = 0;
+  spotifyPlaybackMode = "unknown";
+  spotifyAwaitingSignInRetry = false;
+
+  setScriptAwareText(playerTitle, nextSong.title);
+  setScriptAwareText(playerArtist, nextSong.artist);
+  renderSourceTabs(nextSong, "spotify");
+  playerStatus.textContent = "SPOTIFY · LOADING NEXT…";
+  void markSongRead(nextSong);
+  syncPlayButtons();
+  syncStatsPlayingState();
+
+  const spotifyUrl = spotifyTrackUrlOnly(nextSong.spotifyUrl);
+
+  if (spotifyController && spotifyUrl && typeof spotifyController.loadEntity === "function") {
+    try {
+      spotifyController.loadEntity(spotifyUrl);
+      setTimeout(() => {
+        try {
+          spotifyController?.play?.();
+        } catch { }
+      }, 120);
+    } catch {
+      playSong(nextSong, "spotify");
+    }
+  } else {
+    playSong(nextSong, "spotify");
+  }
+
+  setTimeout(() => {
+    autoNextTransitionLock = false;
+  }, 900);
+}
+
+async function mountSpotifyPlayer(song) {
+  const spotifyUrl = spotifyTrackUrlOnly(song.spotifyUrl);
+  const spotifyEmbedUrl = getSpotifyEmbedUrl(song.spotifyUrl);
+
+  if (!spotifyUrl || !spotifyEmbedUrl) {
+    mountSpotifyFallbackIframe(song, spotifyEmbedUrl || "", "NO EMBEDDABLE SPOTIFY TRACK");
+    return;
+  }
+
+  destroySpotifyPlayer();
+  const mountToken = ++spotifyMountToken;
+
+  spotifyPlaybackMode = "unknown";
+  spotifyAwaitingSignInRetry = false;
+  spotifyHasStarted = false;
+  spotifyEndHandled = false;
+  spotifyLastPosition = 0;
+  spotifyLastDuration = 0;
+
+  playerStatus.textContent = "SPOTIFY · LOADING…";
+  mediaEmbed.className = "media-embed spotify-mode";
+  mediaEmbed.innerHTML = '<div class="spotify-player-mount" aria-label="Spotify player"></div>';
+  const mount = mediaEmbed.querySelector(".spotify-player-mount");
+
+  try {
+    const IFrameAPI = await ensureSpotifyIframeApi();
+
+    if (
+      mountToken !== spotifyMountToken ||
+      currentSource !== "spotify" ||
+      String(currentSongId) !== String(song.id)
+    ) {
+      return;
+    }
+
+    // Mount Spotify at the same mobile height as YouTube to avoid post-mount resizing.
+    const spotifyEmbedHeight = window.matchMedia(
+      "(max-width: 768px), (hover: none) and (pointer: coarse)"
+    ).matches ? 112 : 152;
+
+    IFrameAPI.createController(
+      mount,
+      {
+        width: "100%",
+        height: spotifyEmbedHeight,
+        url: spotifyUrl
+      },
+      controller => {
+        if (
+          mountToken !== spotifyMountToken ||
+          currentSource !== "spotify" ||
+          String(currentSongId) !== String(song.id)
+        ) {
+          try {
+            controller?.destroy?.();
+          } catch { }
+          return;
+        }
+
+        spotifyController = controller;
+
+        controller.addListener("ready", () => {
+          if (mountToken !== spotifyMountToken || currentSource !== "spotify") return;
+
+          playerStatus.textContent = "SPOTIFY · STARTING…";
+
+          try {
+            controller.play();
+          } catch { }
+
+          if (spotifyAutoplayTimer) clearTimeout(spotifyAutoplayTimer);
+          spotifyAutoplayTimer = setTimeout(() => {
+            if (
+              mountToken === spotifyMountToken &&
+              currentSource === "spotify" &&
+              !spotifyHasStarted
+            ) {
+              spotifyPlaybackMode = "blocked";
+              syncSpotifyPlaybackStatus(song);
+            }
+          }, 2800);
+        });
+
+        controller.addListener("playback_started", () => {
+          if (mountToken !== spotifyMountToken || currentSource !== "spotify") return;
+
+          spotifyHasStarted = true;
+          spotifyEndHandled = false;
+
+          if (spotifyAutoplayTimer) {
+            clearTimeout(spotifyAutoplayTimer);
+            spotifyAutoplayTimer = null;
+          }
+
+          if (spotifyPlaybackMode === "unknown" || spotifyPlaybackMode === "blocked") {
+            playerStatus.textContent = "NOW PLAYING · SPOTIFY";
+          }
+        });
+
+        controller.addListener("playback_update", event => {
+          if (
+            mountToken !== spotifyMountToken ||
+            currentSource !== "spotify" ||
+            !spotifyController
+          ) {
+            return;
+          }
+
+          const state = event?.data || {};
+          const duration = Number(state.duration || 0);
+          const position = Number(state.position || 0);
+
+          if (duration > 0) spotifyLastDuration = duration;
+          if (position >= 0) spotifyLastPosition = Math.max(spotifyLastPosition, position);
+
+          if (duration > 0 && duration <= 31000) {
+            if (spotifyPlaybackMode !== "preview") {
+              spotifyPlaybackMode = "preview";
+              const activeSong =
+                songs.find(item => String(item.id) === String(currentSongId)) || song;
+
+              if (spotifyUsesMobileEmbedUx()) {
+                renderMobileSpotifyPreviewHandoff(activeSong);
+              } else {
+                syncSpotifyPlaybackStatus(activeSong);
+              }
+            }
+            return;
+          }
+
+          if (duration > 31000 && spotifyPlaybackMode !== "full") {
+            spotifyPlaybackMode = "full";
+            spotifyAwaitingSignInRetry = false;
+            syncSpotifyPlaybackStatus(
+              songs.find(item => String(item.id) === String(currentSongId)) || song
+            );
+          }
+
+          if (
+            spotifyPlaybackMode === "full" &&
+            spotifyHasStarted &&
+            autoNextEnabled &&
+            !spotifyEndHandled &&
+            !autoNextTransitionLock &&
+            state.isPaused === true &&
+            spotifyLastDuration > 31000 &&
+            Math.max(position, spotifyLastPosition) >= spotifyLastDuration - 1200
+          ) {
+            spotifyEndHandled = true;
+            playNextSpotifySong();
+          }
+        });
+      }
+    );
+  } catch (error) {
+    console.error("Spotify iFrame API failed:", error);
+
+    if (
+      mountToken !== spotifyMountToken ||
+      currentSource !== "spotify" ||
+      String(currentSongId) !== String(song.id)
+    ) {
+      return;
+    }
+
+    mountSpotifyFallbackIframe(
+      song,
+      spotifyEmbedUrl,
+      "SPOTIFY · STANDARD PLAYER · AUTO NEXT UNAVAILABLE"
+    );
+  }
 }
 
 function nextPlayableSong(currentId) {
@@ -3202,8 +3738,7 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
     })());
   }
 
-  // Both lookups still start together, but each source updates the row as soon
-  // as it resolves instead of waiting for the slower lookup to finish.
+  // Start both lookups together and persist each source as soon as it resolves.
   await Promise.allSettled(tasks);
   song.mediaLookupPending = false;
   if (songId) {
@@ -3219,12 +3754,10 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
 
 async function enrichNewSongInBackground(song, options) {
   try {
-    // Media enrichment is the expensive part. It is no longer blocking Add Song,
-    // and YouTube + Spotify are fetched concurrently inside this function.
+    // Media enrichment runs in the background.
     await enrichSongMediaInBackground(song, options);
 
-    // Album resolution stays in the background too, but runs after media lookup
-    // so it can benefit from newly discovered YouTube/Spotify identifiers.
+    // Resolve album metadata after media lookup so it can reuse discovered identifiers.
     const resolvedAlbum = await resolveAlbumMetadataViaSupabase(
       [song],
       { limit: 1 }
@@ -3275,8 +3808,7 @@ form.addEventListener("submit", async event => {
   }
 
   try {
-    // Save the human-entered content immediately. Media links are enrichment,
-    // not a prerequisite for adding the song to the shared archive.
+    // Save user-entered content first; media links are background enrichment.
     const { data: inserted, error } = await supabaseClient
       .from("songs")
       .insert({
@@ -3333,10 +3865,10 @@ form.addEventListener("submit", async event => {
 
     renderSongs();
 
-    // No artificial delay: the modal closes as soon as Supabase confirms insert.
+    // Close as soon as Supabase confirms the insert.
     dialog.close();
 
-    // Do not await this. The song is already saved and visible.
+    // Do not block the UI on background enrichment.
     if (newSong) {
       void enrichNewSongInBackground(newSong, {
         title,
@@ -3592,9 +4124,7 @@ function playSong(song, requestedSource = null) {
 
   const source = requestedSource || (youtubeId ? "youtube" : spotifyEmbedUrl ? "spotify" : null);
 
-  // A just-added song may still be resolving YouTube/Spotify in the background.
-  // Open the player anyway so each source can visibly report FINDING… and then
-  // turn into its normal source button as soon as its URL resolves.
+  // Open the player while background media lookup is still pending.
   if (!source && isSongMediaLookupPending(song)) {
     void markSongRead(song);
     currentSource = null;
@@ -3620,6 +4150,7 @@ function playSong(song, requestedSource = null) {
   renderSourceTabs(song, source);
 
   if (source === "youtube" && youtubeId) {
+    destroySpotifyPlayer();
     currentSource = "youtube";
     playerStatus.textContent = "NOW PLAYING · YOUTUBE";
     mediaEmbed.className = "media-embed youtube-mode";
@@ -3646,19 +4177,13 @@ function playSong(song, requestedSource = null) {
   } else if (source === "spotify" && spotifyEmbedUrl) {
     destroyYouTubePlayer();
     currentSource = "spotify";
-    playerStatus.textContent = "NOW PLAYING · SPOTIFY";
+    playerStatus.textContent = "SPOTIFY · LOADING…";
     mediaEmbed.className = "media-embed spotify-mode";
     mediaEmbed.innerHTML = "";
-
-    const iframe = document.createElement("iframe");
-    iframe.title = `Spotify player: ${song.title} — ${song.artist}`;
-    iframe.src = spotifyEmbedUrl;
-    iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-    iframe.allowFullscreen = true;
-    iframe.loading = "eager";
-    mediaEmbed.appendChild(iframe);
+    void mountSpotifyPlayer(song);
   } else {
     destroyYouTubePlayer();
+    destroySpotifyPlayer();
     currentSource = null;
     playerStatus.textContent = "NO EMBEDDABLE SOURCE";
     mediaEmbed.className = "media-embed";
@@ -3680,6 +4205,11 @@ function renderSourceTabs(song, activeSource) {
   const spotifyReady = Boolean(getSpotifyEmbedUrl(song.spotifyUrl));
   const youtubePending = !youtubeReady && isYouTubeLookupPending(song);
   const spotifyPending = !spotifyReady && isSpotifyLookupPending(song);
+  const spotifyPreviewActive =
+    spotifyReady &&
+    activeSource === "spotify" &&
+    currentSource === "spotify" &&
+    spotifyPlaybackMode === "preview";
 
   if (youtubeReady) {
     sources.push({ key: "youtube", label: "YOUTUBE", pending: false });
@@ -3688,19 +4218,40 @@ function renderSourceTabs(song, activeSource) {
   }
 
   if (spotifyReady) {
-    sources.push({ key: "spotify", label: "SPOTIFY", pending: false });
+    const mobileSpotifyPreview = spotifyPreviewActive && spotifyUsesMobileEmbedUx();
+
+    sources.push({
+      key: "spotify",
+      label:
+        spotifyPreviewActive && !mobileSpotifyPreview
+          ? (spotifyAwaitingSignInRetry ? "SPOTIFY · RETRY" : "SPOTIFY · SIGN IN ↗")
+          : "SPOTIFY",
+      pending: false,
+      previewAction: spotifyPreviewActive && !mobileSpotifyPreview
+    });
+
+    if (mobileSpotifyPreview) {
+      sources.push({
+        key: "spotify-open",
+        label: "OPEN ↗",
+        pending: false,
+        externalSpotifyAction: true
+      });
+    }
   } else if (spotifyPending) {
     sources.push({ key: "spotify", label: "SPOTIFY · FINDING…", pending: true });
   }
 
   sourceTabs.innerHTML = "";
   const hasPendingSource = sources.some(source => source.pending);
-  sourceTabs.hidden = sources.length === 0 || (sources.length < 2 && !hasPendingSource);
+  const hasPreviewAction = sources.some(source => source.previewAction);
+  sourceTabs.hidden = sources.length === 0 || (sources.length < 2 && !hasPendingSource && !hasPreviewAction);
 
   sources.forEach(source => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `source-tab${source.key === activeSource && !source.pending ? " active" : ""}${source.pending ? " is-pending" : ""}`;
+    button.dataset.source = source.key;
+    button.className = `source-tab${source.key === activeSource && !source.pending ? " active" : ""}${source.pending ? " is-pending" : ""}${source.previewAction ? " is-preview-signin" : ""}${source.externalSpotifyAction ? " is-mobile-spotify-open" : ""}`;
 
     const label = document.createElement("span");
     label.className = "source-tab-label";
@@ -3710,6 +4261,23 @@ function renderSourceTabs(song, activeSource) {
     if (source.pending) {
       button.disabled = true;
       button.setAttribute("aria-busy", "true");
+    } else if (source.externalSpotifyAction) {
+      button.setAttribute("aria-label", "Open this track in Spotify");
+      button.addEventListener("click", () => {
+        const target = spotifyTrackUrlOnly(song.spotifyUrl);
+        if (target) window.open(target, "_blank", "noopener,noreferrer");
+      });
+    } else if (source.previewAction) {
+      if (spotifyAwaitingSignInRetry) {
+        button.setAttribute("aria-label", "Retry Spotify after signing in");
+        button.addEventListener("click", () => {
+          spotifyAwaitingSignInRetry = false;
+          playSong(song, "spotify");
+        });
+      } else {
+        button.setAttribute("aria-label", "Sign in to Spotify for full playback");
+        button.addEventListener("click", () => openSpotifyForFullPlayback(song));
+      }
     } else {
       button.addEventListener("click", () => playSong(song, source.key));
     }
@@ -3779,6 +4347,7 @@ function revealPlayer(song) {
 
 function closePlayer() {
   destroyYouTubePlayer();
+  destroySpotifyPlayer();
   playerBar.classList.remove("is-visible");
   setTimeout(() => {
     playerBar.hidden = true;
@@ -3813,8 +4382,7 @@ function refreshOpenPlayerSourceState(song) {
   const latestSong = songs.find(item => String(item.id || "") === String(song.id || "")) || song;
   renderSourceTabs(latestSong, currentSource);
 
-  // Never disturb an already playing YouTube/Spotify embed just because the
-  // other service finished resolving in the background.
+  // Do not remount active playback when another source finishes resolving.
   if (currentSource) return;
 
   const youtubeReady = Boolean(getYouTubeVideoId(latestSong.youtubeUrl));
@@ -3859,9 +4427,7 @@ function isSongMediaLookupPending(song) {
   if (isYouTubeLookupPending(song) || isSpotifyLookupPending(song)) return true;
   if (song.mediaLookupPending) return true;
 
-  // Persisted fallback: the initial fast insert writes spotify_status=pending.
-  // This covers the realtime race where Supabase remaps the row before the
-  // local background task has attached its ID-based pending state.
+  // Persisted pending status covers realtime remaps before local lookup state is attached.
   const hasPlayableLink =
     Boolean(getYouTubeVideoId(song.youtubeUrl)) ||
     Boolean(getSpotifyEmbedUrl(song.spotifyUrl));
@@ -4066,6 +4632,7 @@ function getVisibleSongs() {
 
 function renderSongs() {
   songList.innerHTML = "";
+  const renderBuffer = document.createDocumentFragment();
   const visible = getVisibleSongs();
   songCount.textContent = `${String(songs.length).padStart(3, "0")} SONG${songs.length === 1 ? "" : "S"}`;
   emptyState.hidden = visible.length > 0;
@@ -4248,12 +4815,15 @@ function renderSongs() {
       }
     });
 
-    songList.appendChild(fragment);
+    renderBuffer.appendChild(fragment);
   });
 
+  songList.appendChild(renderBuffer);
   queueMobileSongWrapSync();
   syncPlayButtons();
-  renderStats();
+  if (statsView && !statsView.hidden) {
+    renderStats();
+  }
   syncStatsPlayingState();
   if (wallView && !wallView.hidden) {
     const nextWallSongSignature = wallVisibleSongSignature(getWallSongs());
@@ -5618,6 +6188,17 @@ bootstrapSupabase();
     return Boolean(target.closest(interactiveSelector));
   }
 
+  function targetUsesNativeCursor(target) {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest('.media-embed'));
+  }
+
+  function hideCustomCursorForMedia() {
+    cursor.classList.remove('is-visible');
+    pressed = false;
+    clearTimeout(releaseTimer);
+  }
+
   function syncCursorState(target = lastTarget) {
     if (!finePointer.matches) return;
     lastTarget = target;
@@ -5657,6 +6238,12 @@ bootstrapSupabase();
     pointerX = event.clientX;
     pointerY = event.clientY;
     lastTarget = event.target;
+
+    if (targetUsesNativeCursor(event.target)) {
+      hideCustomCursorForMedia();
+      return;
+    }
+
     cursor.classList.add('is-visible');
     syncCursorState(event.target);
     scheduleCursorDraw();
@@ -5664,6 +6251,13 @@ bootstrapSupabase();
 
   document.addEventListener('pointerdown', event => {
     if (!finePointer.matches || event.pointerType === 'touch') return;
+
+    if (targetUsesNativeCursor(event.target)) {
+      lastTarget = event.target;
+      hideCustomCursorForMedia();
+      return;
+    }
+
     clearTimeout(releaseTimer);
     pressed = true;
     pressStartedAt = performance.now();
@@ -5686,9 +6280,27 @@ bootstrapSupabase();
   document.addEventListener('pointerover', event => {
     if (!finePointer.matches || event.pointerType === 'touch') return;
     lastTarget = event.target;
+
+    if (targetUsesNativeCursor(event.target)) {
+      hideCustomCursorForMedia();
+      return;
+    }
+
     cursor.classList.add('is-visible');
     syncCursorState(event.target);
   }, { passive: true, capture: true });
+
+  mediaEmbed?.addEventListener('mouseenter', () => {
+    if (!finePointer.matches) return;
+    hideCustomCursorForMedia();
+  });
+
+  mediaEmbed?.addEventListener('mouseleave', event => {
+    if (!finePointer.matches) return;
+    lastTarget = event.relatedTarget;
+    cursor.classList.add('is-visible');
+    syncCursorState(event.relatedTarget);
+  });
 
   document.addEventListener('mouseleave', () => {
     cursor.classList.remove('is-visible');
