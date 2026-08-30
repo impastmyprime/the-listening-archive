@@ -93,6 +93,11 @@ const pendingSongReadIds = new Set();
 // Realtime Supabase reloads remap rows into fresh objects, so an object-only
 // `mediaLookupPending` flag can disappear before YouTube/Spotify finishes.
 const pendingMediaLookupIds = new Set();
+// Track each source independently so the player can show, for example,
+// YOUTUBE while SPOTIFY is still FINDING… and promote each tab as soon as
+// that source finishes resolving.
+const pendingYouTubeLookupIds = new Set();
+const pendingSpotifyLookupIds = new Set();
 
 const PIXEL_COLS = 40;
 const PIXEL_ROWS = 20;
@@ -3044,6 +3049,38 @@ dialog.addEventListener("click", event => {
   if (clickedOutside) dialog.close();
 });
 
+function applySongMediaPatchToObject(target, patch) {
+  if (!target || !patch) return;
+
+  if (Object.prototype.hasOwnProperty.call(patch, "youtube_url")) {
+    target.youtubeUrl = String(patch.youtube_url || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_url")) {
+    target.spotifyUrl = String(patch.spotify_url || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_status")) {
+    target.spotifyStatus = String(patch.spotify_status || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_source")) {
+    target.spotifyLookupSource = String(patch.spotify_lookup_source || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_at")) {
+    target.spotifyLookupAt = patch.spotify_lookup_at || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_title")) {
+    target.spotifyTitle = String(patch.spotify_title || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_artist")) {
+    target.spotifyArtist = String(patch.spotify_artist || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_isrc")) {
+    target.spotifyIsrc = String(patch.spotify_isrc || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "spotify_match_confidence")) {
+    target.spotifyMatchConfidence = patch.spotify_match_confidence ?? null;
+  }
+}
+
 async function updateSongMediaPatch(song, patch) {
   if (!song?.id || !patch || !Object.keys(patch).length) return;
 
@@ -3054,37 +3091,16 @@ async function updateSongMediaPatch(song, patch) {
 
   if (error) throw error;
 
-  // Apply only the fields this request actually changed. This avoids one
-  // concurrent media lookup overwriting a newer result from the other source.
-  if (Object.prototype.hasOwnProperty.call(patch, "youtube_url")) {
-    song.youtubeUrl = String(patch.youtube_url || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_url")) {
-    song.spotifyUrl = String(patch.spotify_url || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_status")) {
-    song.spotifyStatus = String(patch.spotify_status || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_source")) {
-    song.spotifyLookupSource = String(patch.spotify_lookup_source || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_lookup_at")) {
-    song.spotifyLookupAt = patch.spotify_lookup_at || null;
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_title")) {
-    song.spotifyTitle = String(patch.spotify_title || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_artist")) {
-    song.spotifyArtist = String(patch.spotify_artist || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_isrc")) {
-    song.spotifyIsrc = String(patch.spotify_isrc || "");
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "spotify_match_confidence")) {
-    song.spotifyMatchConfidence = patch.spotify_match_confidence ?? null;
+  // Update both the object owned by the background task and whichever fresh
+  // object Supabase realtime may already have remapped into the songs array.
+  applySongMediaPatchToObject(song, patch);
+  const liveSong = songs.find(item => String(item.id || "") === String(song.id || ""));
+  if (liveSong && liveSong !== song) {
+    applySongMediaPatchToObject(liveSong, patch);
   }
 
   renderSongs();
+  refreshOpenPlayerSourceState(liveSong || song);
 }
 
 async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "", spotifyUrl = "" }) {
@@ -3096,8 +3112,13 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
   // Keep pending state outside the song object. Supabase realtime replaces song
   // objects after INSERT/UPDATE events, but the ID survives those remaps.
   song.mediaLookupPending = shouldFindYouTube || shouldFindSpotify;
-  if (song.mediaLookupPending && songId) pendingMediaLookupIds.add(songId);
+  if (songId) {
+    if (song.mediaLookupPending) pendingMediaLookupIds.add(songId);
+    if (shouldFindYouTube) pendingYouTubeLookupIds.add(songId);
+    if (shouldFindSpotify) pendingSpotifyLookupIds.add(songId);
+  }
   renderSongs();
+  refreshOpenPlayerSourceState(song);
 
   if (shouldFindYouTube) {
     tasks.push((async () => {
@@ -3111,6 +3132,10 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
         }
       } catch (error) {
         console.error("Background YouTube auto-fetch failed:", error);
+      } finally {
+        if (songId) pendingYouTubeLookupIds.delete(songId);
+        renderSongs();
+        refreshOpenPlayerSourceState(song);
       }
     })());
   }
@@ -3169,6 +3194,10 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
         } catch (updateError) {
           console.error("Could not save Spotify lookup error state:", updateError);
         }
+      } finally {
+        if (songId) pendingSpotifyLookupIds.delete(songId);
+        renderSongs();
+        refreshOpenPlayerSourceState(song);
       }
     })());
   }
@@ -3177,8 +3206,13 @@ async function enrichSongMediaInBackground(song, { title, artist, youtubeUrl = "
   // as it resolves instead of waiting for the slower lookup to finish.
   await Promise.allSettled(tasks);
   song.mediaLookupPending = false;
-  if (songId) pendingMediaLookupIds.delete(songId);
+  if (songId) {
+    pendingMediaLookupIds.delete(songId);
+    pendingYouTubeLookupIds.delete(songId);
+    pendingSpotifyLookupIds.delete(songId);
+  }
   renderSongs();
+  refreshOpenPlayerSourceState(song);
 
   return song;
 }
@@ -3273,8 +3307,11 @@ form.addEventListener("submit", async event => {
     if (inserted) {
       newSong = mapRemoteSong(inserted);
       newSong.mediaLookupPending = !youtubeUrl || !spotifyUrl;
-      if (newSong.mediaLookupPending && newSong.id) {
-        pendingMediaLookupIds.add(String(newSong.id));
+      if (newSong.id) {
+        const newSongId = String(newSong.id);
+        if (newSong.mediaLookupPending) pendingMediaLookupIds.add(newSongId);
+        if (!youtubeUrl) pendingYouTubeLookupIds.add(newSongId);
+        if (!spotifyUrl) pendingSpotifyLookupIds.add(newSongId);
       }
       songs.unshift(newSong);
       renderSongs();
@@ -3556,8 +3593,23 @@ function playSong(song, requestedSource = null) {
   const source = requestedSource || (youtubeId ? "youtube" : spotifyEmbedUrl ? "spotify" : null);
 
   // A just-added song may still be resolving YouTube/Spotify in the background.
-  // Do not open the player with a misleading NO EMBEDDABLE SOURCE error.
-  if (!source && song?.mediaLookupPending) {
+  // Open the player anyway so each source can visibly report FINDING… and then
+  // turn into its normal source button as soon as its URL resolves.
+  if (!source && isSongMediaLookupPending(song)) {
+    void markSongRead(song);
+    currentSource = null;
+    currentSongId = song.id;
+    revealPlayer(song);
+    renderSourceTabs(song, null);
+    playerStatus.textContent = "FINDING PLAYABLE LINK…";
+    mediaEmbed.className = "media-embed";
+    mediaEmbed.innerHTML = `
+      <div class="player-error player-pending-media">
+        YouTube and Spotify are still being checked for this song.
+      </div>`;
+    syncPlayButtons();
+    syncStatsPlayingState();
+    stabilizeMobileArchiveHorizontalPosition();
     return;
   }
 
@@ -3624,21 +3676,44 @@ function playSong(song, requestedSource = null) {
 
 function renderSourceTabs(song, activeSource) {
   const sources = [];
-  if (getYouTubeVideoId(song.youtubeUrl)) sources.push({ key: "youtube", label: "YOUTUBE" });
-  if (getSpotifyEmbedUrl(song.spotifyUrl)) sources.push({ key: "spotify", label: "SPOTIFY" });
+  const youtubeReady = Boolean(getYouTubeVideoId(song.youtubeUrl));
+  const spotifyReady = Boolean(getSpotifyEmbedUrl(song.spotifyUrl));
+  const youtubePending = !youtubeReady && isYouTubeLookupPending(song);
+  const spotifyPending = !spotifyReady && isSpotifyLookupPending(song);
+
+  if (youtubeReady) {
+    sources.push({ key: "youtube", label: "YOUTUBE", pending: false });
+  } else if (youtubePending) {
+    sources.push({ key: "youtube", label: "YOUTUBE · FINDING…", pending: true });
+  }
+
+  if (spotifyReady) {
+    sources.push({ key: "spotify", label: "SPOTIFY", pending: false });
+  } else if (spotifyPending) {
+    sources.push({ key: "spotify", label: "SPOTIFY · FINDING…", pending: true });
+  }
 
   sourceTabs.innerHTML = "";
-  sourceTabs.hidden = sources.length < 2;
+  const hasPendingSource = sources.some(source => source.pending);
+  sourceTabs.hidden = sources.length === 0 || (sources.length < 2 && !hasPendingSource);
 
   sources.forEach(source => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `source-tab${source.key === activeSource ? " active" : ""}`;
+    button.className = `source-tab${source.key === activeSource && !source.pending ? " active" : ""}${source.pending ? " is-pending" : ""}`;
+
     const label = document.createElement("span");
     label.className = "source-tab-label";
     label.textContent = source.label;
     button.appendChild(label);
-    button.addEventListener("click", () => playSong(song, source.key));
+
+    if (source.pending) {
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+    } else {
+      button.addEventListener("click", () => playSong(song, source.key));
+    }
+
     sourceTabs.appendChild(button);
   });
 }
@@ -3716,11 +3791,72 @@ function closePlayer() {
   syncPlayButtons();
 }
 
+function isYouTubeLookupPending(song) {
+  if (!song) return false;
+  const songId = String(song.id || "");
+  return Boolean(songId && pendingYouTubeLookupIds.has(songId));
+}
+
+function isSpotifyLookupPending(song) {
+  if (!song) return false;
+  const songId = String(song.id || "");
+  if (songId && pendingSpotifyLookupIds.has(songId)) return true;
+  return !getSpotifyEmbedUrl(song.spotifyUrl) &&
+    String(song.spotifyStatus || "").toLowerCase() === "pending";
+}
+
+function refreshOpenPlayerSourceState(song) {
+  if (!song || playerBar.hidden || String(currentSongId || "") !== String(song.id || "")) {
+    return;
+  }
+
+  const latestSong = songs.find(item => String(item.id || "") === String(song.id || "")) || song;
+  renderSourceTabs(latestSong, currentSource);
+
+  // Never disturb an already playing YouTube/Spotify embed just because the
+  // other service finished resolving in the background.
+  if (currentSource) return;
+
+  const youtubeReady = Boolean(getYouTubeVideoId(latestSong.youtubeUrl));
+  const spotifyReady = Boolean(getSpotifyEmbedUrl(latestSong.spotifyUrl));
+  const stillPending = isYouTubeLookupPending(latestSong) || isSpotifyLookupPending(latestSong);
+
+  if (youtubeReady || spotifyReady) {
+    playerStatus.textContent = stillPending
+      ? "PLAYABLE LINK FOUND · OTHER SOURCE STILL CHECKING…"
+      : "READY · SELECT SOURCE";
+    mediaEmbed.className = "media-embed";
+    mediaEmbed.innerHTML = `
+      <div class="player-error player-pending-media">
+        A playable source is ready. Choose it above${stillPending ? " while the other source keeps resolving." : "."}
+      </div>`;
+    return;
+  }
+
+  if (stillPending || isSongMediaLookupPending(latestSong)) {
+    playerStatus.textContent = "FINDING PLAYABLE LINK…";
+    mediaEmbed.className = "media-embed";
+    mediaEmbed.innerHTML = `
+      <div class="player-error player-pending-media">
+        YouTube and Spotify are still being checked for this song.
+      </div>`;
+    return;
+  }
+
+  playerStatus.textContent = "NO EMBEDDABLE SOURCE";
+  mediaEmbed.className = "media-embed";
+  mediaEmbed.innerHTML = `
+    <div class="player-error">
+      No playable YouTube or Spotify link was found for this song.
+    </div>`;
+}
+
 function isSongMediaLookupPending(song) {
   if (!song) return false;
 
   const songId = String(song.id || "");
   if (songId && pendingMediaLookupIds.has(songId)) return true;
+  if (isYouTubeLookupPending(song) || isSpotifyLookupPending(song)) return true;
   if (song.mediaLookupPending) return true;
 
   // Persisted fallback: the initial fast insert writes spotify_status=pending.

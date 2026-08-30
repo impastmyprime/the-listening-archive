@@ -13311,3 +13311,18 @@ body.wall-mode #archiveTools #randomSong {
     align-self: last baseline !important;
   }
 }
+
+/* Pending media-source tabs in the player. */
+.player-bar .source-tab.is-pending,
+.player-bar .source-tab.is-pending:hover,
+.player-bar .source-tab.is-pending:focus-visible {
+  opacity: .52 !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-style: normal !important;
+  cursor: progress !important;
+}
+
+.player-bar .source-tab.is-pending .source-tab-label {
+  white-space: nowrap;
+}
