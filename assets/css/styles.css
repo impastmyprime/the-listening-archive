@@ -13767,7 +13767,12 @@ html.archive-startup-loading body.access-checking .archive-startup-loader {
   .player-bar .source-tab .source-tab-label,
   .player-bar .source-tab[data-source="youtube"] .source-tab-label,
   .player-bar .source-tab[data-source="spotify"] .source-tab-label {
-    transform: translateY(1.5px) !important;
+    transform: translateY(.5px) !important;
+  }
+
+  .player-bar .source-tab:hover,
+  .player-bar .source-tab:focus-visible {
+    font-style: italic !important;
   }
 }
 
@@ -13887,4 +13892,44 @@ html.archive-startup-loading .custom-cursor {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+/* Desktop expanded action alignment */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row .play-song,
+  .song-row .delete-song {
+    padding-top: 7px !important;
+    padding-bottom: 4px !important;
+  }
+}
+
+
+/* Mobile player media sizing */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  body.player-open,
+  body.player-open:has(.media-embed.youtube-mode),
+  body.player-open:has(.media-embed.spotify-mode) {
+    padding-bottom: 204px !important;
+  }
+
+  .player-bar,
+  .player-bar:has(.media-embed.youtube-mode),
+  .player-bar:has(.media-embed.spotify-mode) {
+    grid-template-rows: auto 128px !important;
+    max-height: 224px !important;
+  }
+
+  .media-embed,
+  .media-embed.youtube-mode,
+  .media-embed.spotify-mode,
+  .youtube-player-mount,
+  .media-embed iframe,
+  .media-embed.youtube-mode iframe,
+  .media-embed.spotify-mode iframe,
+  .youtube-player-mount iframe,
+  .media-embed.spotify-mode .spotify-player-mount {
+    height: 128px !important;
+    min-height: 128px !important;
+    max-height: 128px !important;
+  }
 }

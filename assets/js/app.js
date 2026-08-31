@@ -3007,7 +3007,7 @@ async function mountSpotifyPlayer(song) {
 
     const spotifyEmbedHeight = window.matchMedia(
       "(max-width: 768px), (hover: none) and (pointer: coarse)"
-    ).matches ? 112 : 152;
+    ).matches ? 128 : 152;
 
     IFrameAPI.createController(
       mount,
@@ -6472,7 +6472,10 @@ function buildDesktopTimelineClusters(ordered, start, span, trackWidth) {
 
 function buildMobileSequenceTimeline(ordered, viewportWidth) {
   const spacing = 34;
-  const edgePadding = 24;
+  const desktopTimeline = window.matchMedia(
+    "(min-width: 769px) and (hover: hover) and (pointer: fine)"
+  ).matches;
+  const edgePadding = desktopTimeline ? 42 : 24;
   const naturalWidth = edgePadding * 2 + Math.max(0, ordered.length - 1) * spacing;
   const trackMinWidth = Math.max(viewportWidth, naturalWidth, 260);
   const step = ordered.length > 1
