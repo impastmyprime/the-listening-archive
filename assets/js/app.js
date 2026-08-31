@@ -131,6 +131,78 @@ let searchTerm = "";
 let currentSongId = null;
 let currentSource = null;
 let backgroundYoutubeFallbackActive = false;
+let shufflePlaybackActive = false;
+let shuffleSongIds = [];
+
+function songIsPlayable(song) {
+  return Boolean(
+    song &&
+    (getYouTubeVideoId(song.youtubeUrl) || getSpotifyEmbedUrl(song.spotifyUrl))
+  );
+}
+
+function shuffleSongs(list) {
+  const mixed = list.slice();
+  for (let index = mixed.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [mixed[index], mixed[swapIndex]] = [mixed[swapIndex], mixed[index]];
+  }
+  return mixed;
+}
+
+function visiblePlaybackSongs() {
+  return wallView && !wallView.hidden ? getWallSongs() : getVisibleSongs();
+}
+
+function getPlaybackOrder() {
+  if (!shufflePlaybackActive || !shuffleSongIds.length) {
+    return visiblePlaybackSongs();
+  }
+
+  const songsById = new Map(songs.map(song => [String(song.id), song]));
+  return shuffleSongIds
+    .map(id => songsById.get(String(id)))
+    .filter(Boolean);
+}
+
+function syncShuffleButtonUi() {
+  if (!randomSongButton) return;
+
+  const isShuffling = Boolean(shufflePlaybackActive);
+  randomSongButton.classList.toggle("is-shuffling", isShuffling);
+  randomSongButton.setAttribute("aria-pressed", String(isShuffling));
+  randomSongButton.dataset.playbackMode = isShuffling ? "shuffle" : "random";
+  randomSongButton.title = isShuffling
+    ? "Turn shuffle off"
+    : "Shuffle the current song list";
+
+  const label = randomSongButton.querySelector("span");
+  if (label) label.textContent = isShuffling ? "SHUFFLE ON" : "RANDOM";
+}
+
+function stopShufflePlayback() {
+  shufflePlaybackActive = false;
+  shuffleSongIds = [];
+  syncShuffleButtonUi();
+}
+
+function startShufflePlayback(songList) {
+  const playable = songList.filter(songIsPlayable);
+  if (!playable.length) return [];
+
+  const mixed = shuffleSongs(playable);
+
+  // Avoid immediately replaying the current song when there are alternatives.
+  if (mixed.length > 1 && String(mixed[0].id) === String(currentSongId || "")) {
+    const swapIndex = 1 + Math.floor(Math.random() * (mixed.length - 1));
+    [mixed[0], mixed[swapIndex]] = [mixed[swapIndex], mixed[0]];
+  }
+
+  shufflePlaybackActive = true;
+  shuffleSongIds = mixed.map(song => song.id);
+  syncShuffleButtonUi();
+  return mixed;
+}
 
 const STARTUP_LOADER_MIN_VISIBLE_MS = 1750;
 
@@ -250,6 +322,8 @@ const mediaEmbed = document.querySelector("#mediaEmbed");
 const footerArchiveSummary = document.querySelector("#footerArchiveSummary");
 const backToTop = document.querySelector("#backToTop");
 const autoNextToggle = document.querySelector("#autoNextToggle");
+const randomSongButton = document.querySelector("#randomSong");
+syncShuffleButtonUi();
 const addSongNav = document.querySelector("#addSongNav");
 
 const archiveView = document.querySelector("#archiveView");
@@ -2048,6 +2122,7 @@ function activePlaybackStatusText() {
     return "BACKGROUND · YOUTUBE";
   }
 
+  if (shufflePlaybackActive && autoNextEnabled) return "SHUFFLE ON";
   return autoNextEnabled ? "AUTO NEXT ON" : "NOW PLAYING";
 }
 
@@ -2493,24 +2568,13 @@ function ensureSpotifyIframeApi() {
   return spotifyIframeApiPromise;
 }
 
-function nextSpotifySong(currentId) {
-  const startIndex = songs.findIndex(song => String(song.id) === String(currentId));
-  if (startIndex < 0) return null;
-
-  for (let index = startIndex + 1; index < songs.length; index++) {
-    const candidate = songs[index];
-    if (spotifyTrackUrlOnly(candidate.spotifyUrl)) return candidate;
-  }
-
-  return null;
-}
-
 function nextYouTubeSong(currentId) {
-  const startIndex = songs.findIndex(song => String(song.id) === String(currentId));
+  const ordered = getPlaybackOrder();
+  const startIndex = ordered.findIndex(song => String(song.id) === String(currentId));
   if (startIndex < 0) return null;
 
-  for (let index = startIndex + 1; index < songs.length; index++) {
-    const candidate = songs[index];
+  for (let index = startIndex + 1; index < ordered.length; index++) {
+    const candidate = ordered[index];
     if (getYouTubeVideoId(candidate.youtubeUrl)) return candidate;
   }
 
@@ -2896,9 +2960,27 @@ function playNextSpotifySong() {
     return;
   }
 
-  const nextSong = nextSpotifySong(currentSongId);
+  const nextSong = nextPlayableSong(currentSongId);
 
   if (!nextSong) {
+    playerStatus.textContent = "END OF QUEUE";
+    return;
+  }
+
+  const nextSpotifyUrl = spotifyTrackUrlOnly(nextSong.spotifyUrl);
+  const nextYouTubeId = getYouTubeVideoId(nextSong.youtubeUrl);
+
+  // Keep the shuffled/filtered order even when the next track changes source.
+  if (!nextSpotifyUrl && nextYouTubeId) {
+    autoNextTransitionLock = true;
+    playSong(nextSong, "youtube");
+    setTimeout(() => {
+      autoNextTransitionLock = false;
+    }, 650);
+    return;
+  }
+
+  if (!nextSpotifyUrl) {
     playerStatus.textContent = "END OF QUEUE";
     return;
   }
@@ -2933,7 +3015,7 @@ function playNextSpotifySong() {
   syncPlayButtons();
   syncStatsPlayingState();
 
-  const spotifyUrl = spotifyTrackUrlOnly(nextSong.spotifyUrl);
+  const spotifyUrl = nextSpotifyUrl;
 
   if (spotifyController && spotifyUrl && typeof spotifyController.loadEntity === "function") {
     try {
@@ -3262,18 +3344,15 @@ async function mountSpotifyPlayer(song) {
 }
 
 function nextPlayableSong(currentId) {
-  const ordered = [...songs];
-  const startIndex = ordered.findIndex(song => song.id === currentId);
+  const ordered = getPlaybackOrder();
+  const startIndex = ordered.findIndex(song => String(song.id) === String(currentId));
 
   if (startIndex < 0) return null;
 
   for (let index = startIndex + 1; index < ordered.length; index++) {
     const candidate = ordered[index];
 
-    if (
-      getYouTubeVideoId(candidate.youtubeUrl) ||
-      getSpotifyEmbedUrl(candidate.spotifyUrl)
-    ) {
+    if (songIsPlayable(candidate)) {
       return candidate;
     }
   }
@@ -3282,13 +3361,14 @@ function nextPlayableSong(currentId) {
 }
 
 function buildYouTubeAutoQueue(currentSong) {
-  const startIndex = songs.findIndex(song => song.id === currentSong.id);
+  const ordered = getPlaybackOrder();
+  const startIndex = ordered.findIndex(song => String(song.id) === String(currentSong.id));
   if (startIndex < 0) return [];
 
   const queue = [];
 
-  for (let index = startIndex; index < songs.length; index++) {
-    const candidate = songs[index];
+  for (let index = startIndex; index < ordered.length; index++) {
+    const candidate = ordered[index];
     const videoId = getYouTubeVideoId(candidate.youtubeUrl);
     const spotifyUrl = getSpotifyEmbedUrl(candidate.spotifyUrl);
 
@@ -3959,10 +4039,6 @@ async function resolvePrototypeAlbum(song) {
   return result;
 }
 
-function senderDisplayName(song) {
-  return song.senderPerson === "owner" ? ownerName() : friendName();
-}
-
 function makeAlbumGroups(resolvedSongs) {
   const groups = new Map();
 
@@ -3987,126 +4063,6 @@ function makeAlbumGroups(resolvedSongs) {
   return Array.from(groups.values());
 }
 
-
-const WALL_HALFTONE_PURPLE = "#5168E0";
-const WALL_HALFTONE_YELLOW = "#FFFF2E";
-const wallHalftonePromiseCache = new Map();
-
-function wallHalftoneProxyUrl(src) {
-  const raw = String(src || "").trim();
-  if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
-  try {
-    const parsed = new URL(raw, window.location.href);
-    if (parsed.origin === window.location.origin) return parsed.href;
-    return `https://images.weserv.nl/?url=${encodeURIComponent(parsed.href)}&w=420&h=420&fit=cover&output=jpg&q=92`;
-  } catch {
-    return raw;
-  }
-}
-
-function loadHalftoneSource(src, useProxy = false) {
-  return new Promise((resolve, reject) => {
-    const source = new Image();
-    source.decoding = "async";
-    source.crossOrigin = "anonymous";
-    source.onload = () => resolve(source);
-    source.onerror = () => reject(new Error("halftone source failed"));
-    source.src = useProxy ? wallHalftoneProxyUrl(src) : src;
-  });
-}
-
-async function getHalftoneSource(src) {
-  try {
-    return await loadHalftoneSource(src, false);
-  } catch {
-    return loadHalftoneSource(src, true);
-  }
-}
-
-function renderTrueWallHalftone(source, canvas) {
-  const outputSize = 420;
-  const step = 5;
-  const cols = Math.ceil(outputSize / step);
-  const rows = Math.ceil(outputSize / step);
-
-  canvas.width = outputSize;
-  canvas.height = outputSize;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) return false;
-
-  const sample = document.createElement("canvas");
-  sample.width = cols;
-  sample.height = rows;
-  const sctx = sample.getContext("2d", { willReadFrequently: true });
-  if (!sctx) return false;
-
-  sctx.fillStyle = "#fff";
-  sctx.fillRect(0, 0, cols, rows);
-  sctx.drawImage(source, 0, 0, cols, rows);
-
-  let pixels;
-  try {
-    pixels = sctx.getImageData(0, 0, cols, rows).data;
-  } catch {
-    return false;
-  }
-
-  ctx.fillStyle = WALL_HALFTONE_PURPLE;
-  ctx.fillRect(0, 0, outputSize, outputSize);
-  ctx.fillStyle = WALL_HALFTONE_YELLOW;
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const i = (row * cols + col) * 4;
-      const alpha = pixels[i + 3] / 255;
-      const luminance = ((pixels[i] * 0.2126) + (pixels[i + 1] * 0.7152) + (pixels[i + 2] * 0.0722)) / 255;
-
-      let tone = Math.max(0, Math.min(1, luminance * alpha));
-      tone = Math.max(0, Math.min(1, (tone - 0.045) / 0.91));
-      tone = Math.pow(tone, 0.95);
-
-      const radius = 0.12 + tone * 2.02;
-      if (radius <= 0.16) continue;
-
-      const x = col * step + step * 0.5;
-      const y = row * step + step * 0.5;
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  return true;
-}
-
-function ensureTrueWallHalftone(img, canvas) {
-  if (canvas.dataset.ready === "true") return Promise.resolve(true);
-  const src = String(img.currentSrc || img.src || "");
-  if (!src) return Promise.resolve(false);
-
-  const existing = wallHalftonePromiseCache.get(src);
-  if (existing) {
-    return existing.then(result => {
-      if (result && result.source && renderTrueWallHalftone(result.source, canvas)) {
-        canvas.dataset.ready = "true";
-        return true;
-      }
-      return false;
-    });
-  }
-
-  const promise = getHalftoneSource(src)
-    .then(source => ({ source }))
-    .catch(() => null);
-  wallHalftonePromiseCache.set(src, promise);
-
-  return promise.then(result => {
-    if (!result?.source) return false;
-    const rendered = renderTrueWallHalftone(result.source, canvas);
-    if (rendered) canvas.dataset.ready = "true";
-    return rendered;
-  });
-}
 
 function makeAlbumArtCell(group) {
   const fallbackSong = group.songs[0];
@@ -4791,6 +4747,7 @@ form.addEventListener("submit", async event => {
     setSpotifyAutoStatus("OPTIONAL · AUTO-FETCH");
 
     currentFilter = "all";
+    stopShufflePlayback();
     document
       .querySelectorAll(".filter")
       .forEach(x => x.classList.remove("active"));
@@ -4823,6 +4780,7 @@ filters.addEventListener("click", event => {
   const button = event.target.closest(".filter");
   if (!button) return;
   currentFilter = button.dataset.filter;
+  stopShufflePlayback();
   document.querySelectorAll(".filter").forEach(x => x.classList.remove("active"));
   button.classList.add("active");
   renderSongs();
@@ -4830,15 +4788,20 @@ filters.addEventListener("click", event => {
 
 searchInput.addEventListener("input", event => {
   searchTerm = event.target.value.trim().toLowerCase();
+  stopShufflePlayback();
   renderSongs();
 });
 
-document.querySelector("#randomSong").addEventListener("click", () => {
-  const visible = wallView && !wallView.hidden ? getWallSongs() : getVisibleSongs();
-  if (!visible.length) return;
+randomSongButton?.addEventListener("click", () => {
+  if (shufflePlaybackActive) {
+    stopShufflePlayback();
+    return;
+  }
 
-  const pick = visible[Math.floor(Math.random() * visible.length)];
+  const mixed = startShufflePlayback(visiblePlaybackSongs());
+  if (!mixed.length) return;
 
+  const pick = mixed[0];
   const preferredSource =
     getYouTubeVideoId(pick.youtubeUrl)
       ? "youtube"
@@ -4992,28 +4955,6 @@ async function findSpotifySong(title, artist) {
   };
 }
 
-function formatSpotifyApiError(error) {
-  const message = String(error?.message || "").toLowerCase();
-
-  if (message.includes("404") || message.includes("not found")) {
-    return "SPOTIFY AUTO-FETCH NOT DEPLOYED · SONG CAN STILL BE SAVED";
-  }
-
-  if (
-    message.includes("access not claimed") ||
-    message.includes("unauthorized") ||
-    message.includes("jwt")
-  ) {
-    return "SPOTIFY AUTO-FETCH FAILED · ACCESS SESSION ERROR";
-  }
-
-  if (message.includes("listenbrainz") || message.includes("spotify")) {
-    return `SPOTIFY AUTO-FETCH FAILED · ${String(error?.message || "CHECK EDGE FUNCTION").toUpperCase()}`;
-  }
-
-  return "SPOTIFY AUTO-FETCH FAILED · SONG CAN STILL BE SAVED";
-}
-
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -5044,28 +4985,6 @@ async function findYouTubeSong(title, artist) {
   }
 
   return data?.match || null;
-}
-
-function formatYouTubeApiError(error) {
-  const message = String(error?.message || "").toLowerCase();
-
-  if (message.includes("quota")) {
-    return "YOUTUBE AUTO-FETCH FAILED · API QUOTA REACHED";
-  }
-
-  if (
-    message.includes("access not claimed") ||
-    message.includes("unauthorized") ||
-    message.includes("jwt")
-  ) {
-    return "YOUTUBE AUTO-FETCH FAILED · ACCESS SESSION ERROR";
-  }
-
-  if (message.includes("api") || message.includes("youtube")) {
-    return `YOUTUBE AUTO-FETCH FAILED · ${String(error?.message || "CHECK EDGE FUNCTION").toUpperCase()}`;
-  }
-
-  return "YOUTUBE AUTO-FETCH FAILED · SONG CAN STILL BE SAVED";
 }
 
 function playSong(song, requestedSource = null, options = {}) {
@@ -5440,19 +5359,6 @@ function syncPlayButtons() {
 }
 
 
-function loadLegacySongs() {
-  try {
-    const saved = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!saved) return [];
-
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-function saveSongs() { }
-
 function containsCyrillic(value) {
   return /[\u0400-\u052F]/u.test(String(value ?? ""));
 }
@@ -5607,7 +5513,7 @@ function renderSongs() {
   songCount.textContent = `${String(songs.length).padStart(3, "0")} SONG${songs.length === 1 ? "" : "S"}`;
   emptyState.hidden = visible.length > 0;
 
-  visible.forEach(song => {
+  visible.forEach((song, visibleIndex) => {
     const fragment = template.content.cloneNode(true);
     const row = fragment.querySelector(".song-row");
     let titleButton = fragment.querySelector(".song-title");
@@ -5647,7 +5553,7 @@ function renderSongs() {
     row.dataset.id = song.id;
 
 
-    const displayNumber = String(songs.length - songs.indexOf(song)).padStart(3, "0");
+    const displayNumber = String(visible.length - visibleIndex).padStart(3, "0");
     fragment.querySelector(".song-number").textContent = displayNumber;
     fragment.querySelector(".expanded-number").textContent = displayNumber;
     const titleText = titleButton.querySelector(".song-title-text");
@@ -5806,24 +5712,6 @@ function chronologicalSongs() {
   return [...songs].sort((a, b) => parseSongDate(a) - parseSongDate(b));
 }
 
-function sameCalendarMonth(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth()
-  );
-}
-
-function ordinal(value) {
-  const n = Number(value) || 0;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}TH`;
-  const mod10 = n % 10;
-  if (mod10 === 1) return `${n}ST`;
-  if (mod10 === 2) return `${n}ND`;
-  if (mod10 === 3) return `${n}RD`;
-  return `${n}TH`;
-}
-
 function senderLabel(song) {
   if (song?.senderPerson === "owner") {
     return ownerName();
@@ -5843,69 +5731,6 @@ function normalizeArtist(value) {
 function dayDiff(later, earlier) {
   const diff = later.getTime() - earlier.getTime();
   return Math.max(0, Math.round(diff / 86400000));
-}
-
-function getSongContext(song) {
-  const ordered = chronologicalSongs();
-  const index = ordered.findIndex(item => item.id === song.id);
-  if (index < 0) return "ONE MORE ENTRY IN THE ARCHIVE.";
-
-  const upToSong = ordered.slice(0, index + 1);
-  const beforeSong = ordered.slice(0, index);
-  const date = parseSongDate(song);
-  const artistKey = normalizeArtist(song.artist);
-  const sender = song.recommendedBy;
-  const label = senderLabel(song);
-
-  const artistAppearances = upToSong.filter(
-    item => normalizeArtist(item.artist) === artistKey
-  ).length;
-
-  const totalArtistAppearances = ordered.filter(
-    item => normalizeArtist(item.artist) === artistKey
-  ).length;
-
-  let streak = 1;
-  for (let i = index - 1; i >= 0; i--) {
-    if (ordered[i].recommendedBy !== sender) break;
-    streak++;
-  }
-
-  const monthCount = upToSong.filter(item => {
-    return (
-      item.recommendedBy === sender &&
-      sameCalendarMonth(parseSongDate(item), date)
-    );
-  }).length;
-
-  const previousSameSender = [...beforeSong]
-    .reverse()
-    .find(item => item.recommendedBy === sender);
-
-  if (artistAppearances > 1) {
-    return `${String(song.artist).toUpperCase()} · ${ordinal(artistAppearances)} APPEARANCE`;
-  }
-
-  if (streak >= 3) {
-    return `${ordinal(streak)} SONG FROM ${label} IN A ROW`;
-  }
-
-  if (monthCount >= 3) {
-    return `${ordinal(monthCount)} SONG FROM ${label} THIS MONTH`;
-  }
-
-  if (totalArtistAppearances > 1) {
-    return `FIRST OF ${totalArtistAppearances} ${String(song.artist).toUpperCase()} SONGS IN THE ARCHIVE`;
-  }
-
-  if (previousSameSender) {
-    const gap = dayDiff(date, parseSongDate(previousSameSender));
-    if (gap >= 2) {
-      return `${gap} DAYS SINCE ${label}'S LAST RECOMMENDATION`;
-    }
-  }
-
-  return `FIRST ${String(song.artist).toUpperCase()} SONG IN THE ARCHIVE`;
 }
 
 function getArchiveStats() {
@@ -6397,19 +6222,6 @@ function timelineMonthStart(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function timelineMonthsBetween(startDate, endDate) {
-  const months = [];
-  let cursor = timelineMonthStart(startDate);
-  const finalMonth = timelineMonthStart(endDate);
-
-  while (cursor <= finalMonth) {
-    months.push(new Date(cursor));
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-  }
-
-  return months;
-}
-
 function timelineMonthAxisLabel(date, includeYear = false) {
   const month = new Intl.DateTimeFormat("en", { month: "short" })
     .format(date)
@@ -6417,57 +6229,6 @@ function timelineMonthAxisLabel(date, includeYear = false) {
 
   if (!includeYear) return month;
   return `${month} '${String(date.getFullYear()).slice(-2)}`;
-}
-
-function buildDesktopTimelineClusters(ordered, start, span, trackWidth) {
-  const thresholdPx = 22;
-  const lanes = { me: [], friend: [] };
-
-  ordered.forEach((song, index) => {
-    const time = parseSongDate(song).getTime();
-    const ratio = Math.max(0, Math.min(1, (time - start) / span));
-    const item = { song, index, ratio, x: ratio * trackWidth };
-    lanes[song.recommendedBy === "me" ? "me" : "friend"].push(item);
-  });
-
-  const clusters = [];
-
-  Object.entries(lanes).forEach(([lane, items]) => {
-    if (!items.length) return;
-
-    let current = [items[0]];
-
-    const commit = () => {
-      if (!current.length) return;
-      const avgRatio = current.reduce((sum, item) => sum + item.ratio, 0) / current.length;
-      clusters.push({
-        lane,
-        ratio: avgRatio,
-        firstIndex: current[0].index,
-        songs: current.map(item => item.song),
-        grouping: "collision"
-      });
-    };
-
-    for (let i = 1; i < items.length; i++) {
-      const item = items[i];
-      const previous = current[current.length - 1];
-
-      if (item.x - previous.x <= thresholdPx) {
-        current.push(item);
-      } else {
-        commit();
-        current = [item];
-      }
-    }
-
-    commit();
-  });
-
-  return {
-    clusters: clusters.sort((a, b) => a.firstIndex - b.firstIndex),
-    months: []
-  };
 }
 
 function buildMobileSequenceTimeline(ordered, viewportWidth) {
@@ -7007,16 +6768,6 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
-function safeLink(url) {
-  if (!url) return "#";
-  try {
-    const parsed = new URL(url);
-    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : "#";
-  } catch {
-    return "#";
-  }
-}
-
 function shortDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -7024,15 +6775,6 @@ function shortDate(value) {
     day: "2-digit",
     month: "2-digit"
   }).format(date);
-}
-
-function longDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short"
-  }).format(date).toUpperCase();
 }
 
 function initials(title, artist) {
