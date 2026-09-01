@@ -8747,7 +8747,7 @@
     align-self: start !important;
     margin: 0 !important;
     padding: 2px 0 0 !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     line-height: 1 !important;
     letter-spacing: normal !important;
     font-variant-numeric: tabular-nums !important;
@@ -9756,7 +9756,7 @@
     justify-self: start !important;
     margin: 0 !important;
     padding: 0 !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     line-height: 1 !important;
     transform: none !important;
   }
@@ -13191,6 +13191,14 @@ html.archive-startup-loading .custom-cursor {
 }
 
 
+/* Desktop multiline-note action alignment */
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  .song-row.is-note-multiline .expanded-actions {
+    transform: translateY(-1px) !important;
+  }
+}
+
+
 /* Mobile player media sizing */
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   body.player-open,
@@ -13445,5 +13453,971 @@ html.archive-startup-loading .custom-cursor {
 
   #songList .song-row.mobile-expanded .expanded-note {
     display: block !important;
+  }
+}
+
+/* ================================================================
+   ULTRA-SMALL MOBILE (< 344px)
+   Preserve the normal mobile composition above this breakpoint while
+   preventing fixed-width controls and metadata from colliding below it.
+   ================================================================ */
+@media (max-width: 343px) {
+  :root {
+    --pad: 8px;
+  }
+
+  .site-header {
+    padding: 12px var(--pad) 22px !important;
+  }
+
+  .title-wrap h1 {
+    font-size: clamp(2.75rem, 16.6vw, 3.45rem) !important;
+    line-height: .84 !important;
+  }
+
+  .intro {
+    margin: 20px 0 22px !important;
+    font-size: 12px !important;
+  }
+
+  .header-meta {
+    gap: 7px !important;
+    font-size: 9px !important;
+  }
+
+  /* Keep the first toolbar row genuinely fluid. */
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 6px 5px !important;
+    padding: 7px var(--pad) 8px !important;
+  }
+
+  .view-switch {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+  }
+
+  .toolbar .view-switch .view-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 3px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 9px !important;
+  }
+
+  .nav-actions {
+    gap: 3px !important;
+  }
+
+  /* Auto-next becomes icon-only at this width. */
+  #autoNextToggle,
+  #autoNextToggle[aria-pressed="true"],
+  #autoNextToggle[aria-pressed="false"] {
+    position: relative !important;
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    text-indent: -9999px !important;
+    white-space: nowrap !important;
+    font-size: 0 !important;
+  }
+
+  #autoNextToggle::after {
+    content: "↻" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    text-indent: 0 !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+  }
+
+  .nav-add-song {
+    width: auto !important;
+    min-width: 56px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 5px 4px 4px !important;
+    font-size: 8px !important;
+  }
+
+  .archive-tools {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+  }
+
+  .filter-group {
+    min-width: 0 !important;
+    gap: 5px !important;
+    overflow: hidden !important;
+  }
+
+  .filter {
+    min-width: 0 !important;
+    font-size: 8px !important;
+  }
+
+  #randomSong {
+    padding: 4px 5px 3px !important;
+    font-size: 8px !important;
+  }
+
+  .search-wrap input {
+    min-height: 28px !important;
+    font-size: 10px !important;
+  }
+
+  /* Do not allow sender/date max-content widths to crush the song title. */
+  .table-head,
+  #songList .song-row .row-main,
+  #songList .song-row:hover .row-main,
+  #songList .song-row:focus-within .row-main,
+  #songList .song-row:active .row-main,
+  #songList .song-row.is-playing .row-main,
+  #songList .song-row.mobile-expanded .row-main {
+    grid-template-columns: 1.7rem minmax(0, 1fr) 2.65rem !important;
+    gap: 2px 6px !important;
+  }
+
+  #songList .song-row {
+    --mobile-copy-inset: calc(1.7rem + 6px);
+  }
+
+  .song-number {
+    font-size: 9px !important;
+  }
+
+  #songList .song-row .song-title,
+  #songList .song-row:is(:hover, :focus-within, :active, .is-playing, .mobile-expanded) .song-title {
+    gap: 5px !important;
+    font-size: 15px !important;
+  }
+
+  #songList .song-row .song-from,
+  #songList .song-row .song-date {
+    width: 2.65rem !important;
+    min-width: 0 !important;
+    max-width: 2.65rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 8px !important;
+  }
+
+  #songList .song-row .song-artist {
+    font-size: 10px !important;
+  }
+
+  #songList .song-row .mobile-details-toggle {
+    grid-column: 2 / 4 !important;
+    font-size: 8px !important;
+  }
+
+  #songList .song-row .row-expanded,
+  #songList .song-row.mobile-expanded .row-expanded {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 7px !important;
+    padding-left: var(--mobile-copy-inset) !important;
+  }
+
+  #songList .song-row.mobile-expanded .row-expanded {
+    padding-top: 4px !important;
+    padding-bottom: 12px !important;
+  }
+
+  #songList .song-row .expanded-copy,
+  #songList .song-row .expanded-actions {
+    grid-column: 1 !important;
+  }
+
+  #songList .song-row .expanded-actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    margin-top: 1px !important;
+  }
+
+  #songList .song-row .expanded-note {
+    font-size: 11px !important;
+  }
+
+  #songList .song-row .play-song,
+  #songList .song-row .delete-song {
+    padding: 5px 6px 4px !important;
+    font-size: 8px !important;
+  }
+
+  /* Stats: reduce only the pieces with rigid horizontal footprints. */
+  .stats-hero {
+    padding-top: 22px !important;
+  }
+
+  .stats-hero h2 {
+    margin: 28px 0 40px !important;
+    font-size: clamp(2.25rem, 12.2vw, 2.85rem) !important;
+  }
+
+  .stats-summary-line {
+    align-items: flex-start !important;
+    gap: 5px 12px !important;
+    font-size: 8px !important;
+  }
+
+  .balance-numbers strong {
+    font-size: clamp(3.45rem, 18vw, 4.5rem) !important;
+  }
+
+  .viz-heading h3 {
+    font-size: clamp(1.9rem, 10.5vw, 2.5rem) !important;
+  }
+
+  .timeline-art {
+    grid-template-columns: 20px minmax(0, 1fr) !important;
+    column-gap: 4px !important;
+  }
+
+  .timeline-dates {
+    margin-left: 24px !important;
+  }
+
+  .timeline-legend {
+    gap: 8px !important;
+    font-size: 8px !important;
+  }
+
+  .artist-rank-row {
+    grid-template-columns: 1.65rem minmax(0, 1fr) 2.3rem !important;
+    column-gap: 6px !important;
+  }
+
+  .artist-rank-name,
+  .artist-rank-row:first-child .artist-rank-name {
+    font-size: clamp(1.35rem, 7.2vw, 1.8rem) !important;
+  }
+
+  .weird-fact {
+    grid-template-columns: 1.65rem minmax(0, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .weird-fact p {
+    font-size: 12px !important;
+  }
+
+  /* Wall header can stack rather than forcing two labels onto one line. */
+  .wall-head {
+    height: auto !important;
+    min-height: 40px !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+  }
+
+  .wall-prototype-note {
+    margin-left: 0 !important;
+    text-align: left !important;
+  }
+
+  .album-editorial-info {
+    padding: 6px !important;
+  }
+
+  .album-editorial-eyebrow {
+    top: 5px !important;
+    left: 5px !important;
+    right: 5px !important;
+    font-size: 5px !important;
+  }
+
+  .album-editorial-name {
+    font-size: .82rem !important;
+  }
+
+  /* Player: shorten the media row and let metadata wrap instead of overlap. */
+  body.player-open,
+  body.player-open:has(.media-embed.youtube-mode),
+  body.player-open:has(.media-embed.spotify-mode) {
+    padding-bottom: 176px !important;
+  }
+
+  .player-bar,
+  .player-bar:has(.media-embed.youtube-mode),
+  .player-bar:has(.media-embed.spotify-mode) {
+    grid-template-columns: minmax(0, 1fr) 26px !important;
+    grid-template-rows: auto 104px !important;
+    gap: 5px !important;
+    padding: 7px var(--pad) 8px !important;
+    max-height: 190px !important;
+  }
+
+  #playerTitle {
+    font-size: 1.08rem !important;
+  }
+
+  .player-bar .player-meta-row {
+    height: auto !important;
+    min-height: 18px !important;
+    margin-top: 4px !important;
+    flex-wrap: wrap !important;
+    gap: 3px !important;
+  }
+
+  .player-bar .source-tabs,
+  .player-bar .source-tabs:has(.source-tab.is-mobile-spotify-open) {
+    height: auto !important;
+    min-height: 18px !important;
+    flex-wrap: wrap !important;
+    gap: 3px !important;
+  }
+
+  .player-bar .source-tab,
+  .player-bar .source-tab[data-source="youtube"],
+  .player-bar .source-tab[data-source="spotify"] {
+    height: 18px !important;
+    min-height: 18px !important;
+    padding: 0 5px !important;
+    font-size: 8px !important;
+  }
+
+  .media-embed,
+  .media-embed.youtube-mode,
+  .media-embed.spotify-mode,
+  .youtube-player-mount,
+  .media-embed iframe,
+  .media-embed.youtube-mode iframe,
+  .media-embed.spotify-mode iframe,
+  .youtube-player-mount iframe,
+  .media-embed.spotify-mode .spotify-player-mount {
+    height: 104px !important;
+    min-height: 104px !important;
+    max-height: 104px !important;
+  }
+
+  /* Dialog: keep all controls inside the viewport. */
+  .song-dialog {
+    width: calc(100vw - 8px) !important;
+  }
+
+  .song-dialog form {
+    padding: 9px !important;
+  }
+
+  .dialog-top h2 {
+    font-size: clamp(2.15rem, 12vw, 2.8rem) !important;
+  }
+
+  /* Access gate: preserve the composition, but make the form truly flexible. */
+  .access-title-form-row .access-form {
+    margin-left: 4vw !important;
+    margin-right: 4vw !important;
+  }
+
+  .access-title-form-row .access-input-row {
+    grid-template-columns: minmax(0, 1fr) 78px !important;
+    gap: 6px !important;
+  }
+
+  .access-title-form-row .access-form input,
+  .access-title-form-row .access-form button {
+    height: 38px !important;
+  }
+
+  .access-title-form-row .access-form button {
+    padding-inline: 6px !important;
+    font-size: 13px !important;
+  }
+
+  .access-description {
+    width: 55vw !important;
+    margin-left: 4vw !important;
+  }
+}
+
+
+/* Ultra-small readability pass: keep the anti-overlap layout, but do not
+   sacrifice legibility or control consistency on 320–343px screens. */
+@media (max-width: 343px) {
+  :root {
+    --ultra-control-h: 34px;
+    --ultra-action-h: 34px;
+  }
+
+  .intro {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+
+  .header-meta {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+
+  /* One control height for the primary mobile toolbar. */
+  .toolbar .view-switch .view-button,
+  #autoNextToggle,
+  #autoNextToggle[aria-pressed="true"],
+  #autoNextToggle[aria-pressed="false"],
+  .nav-add-song,
+  #randomSong,
+  .search-wrap input {
+    height: var(--ultra-control-h) !important;
+    min-height: var(--ultra-control-h) !important;
+    box-sizing: border-box !important;
+  }
+
+  .toolbar .view-switch .view-button {
+    padding: 0 5px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  #autoNextToggle,
+  #autoNextToggle[aria-pressed="true"],
+  #autoNextToggle[aria-pressed="false"] {
+    width: var(--ultra-control-h) !important;
+    min-width: var(--ultra-control-h) !important;
+    max-width: var(--ultra-control-h) !important;
+  }
+
+  #autoNextToggle::after {
+    font-size: 15px !important;
+  }
+
+  .nav-add-song {
+    min-width: 62px !important;
+    padding: 0 7px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  #randomSong {
+    padding: 0 7px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  .filter {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  .search-wrap input {
+    padding-block: 0 !important;
+    font-size: 12px !important;
+  }
+
+  .song-number {
+    font-size: 10px !important;
+  }
+
+  #songList .song-row .song-from,
+  #songList .song-row .song-date {
+    font-size: 10px !important;
+  }
+
+  #songList .song-row .song-artist {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+
+  #songList .song-row .mobile-details-toggle {
+    font-size: 10px !important;
+  }
+
+  #songList .song-row .expanded-note {
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+  }
+
+  #songList .song-row .play-song,
+  #songList .song-row .delete-song {
+    height: var(--ultra-action-h) !important;
+    min-height: var(--ultra-action-h) !important;
+    padding: 0 8px !important;
+    box-sizing: border-box !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  .stats-summary-line,
+  .timeline-legend {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+
+  .album-editorial-eyebrow {
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+
+  .album-editorial-name {
+    font-size: .9rem !important;
+  }
+
+  .player-bar .source-tab,
+  .player-bar .source-tab[data-source="youtube"],
+  .player-bar .source-tab[data-source="spotify"] {
+    height: var(--ultra-action-h) !important;
+    min-height: var(--ultra-action-h) !important;
+    padding: 0 8px !important;
+    box-sizing: border-box !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  .player-bar .source-tabs,
+  .player-bar .source-tabs:has(.source-tab.is-mobile-spotify-open),
+  .player-bar .player-meta-row {
+    min-height: var(--ultra-action-h) !important;
+  }
+
+  .access-title-form-row .access-form input,
+  .access-title-form-row .access-form button {
+    height: var(--ultra-control-h) !important;
+    min-height: var(--ultra-control-h) !important;
+    box-sizing: border-box !important;
+  }
+
+  .access-title-form-row .access-form input {
+    font-size: 12px !important;
+  }
+
+  .access-title-form-row .access-form button {
+    font-size: 12px !important;
+    padding-inline: 7px !important;
+  }
+}
+
+/* Ultra-small control alignment: filters participate in the same 34px rhythm. */
+@media (max-width: 343px) {
+  .filter-group {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .filter {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--ultra-control-h) !important;
+    min-height: var(--ultra-control-h) !important;
+    padding: 0 2px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+  }
+
+  #songList .song-row .mobile-details-toggle {
+    font-size: 11px !important;
+  }
+
+  .album-editorial-eyebrow {
+    font-size: 9px !important;
+  }
+}
+
+/* Ultra-small filter correction: preserve full participant names and keep the
+   filter row anchored to the same left edge as the ARCHIVE tab. */
+@media (max-width: 343px) {
+  .archive-tools {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .filter-group {
+    display: flex !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    justify-self: start !important;
+    gap: 7px !important;
+    overflow: visible !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .filter {
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    height: var(--ultra-control-h) !important;
+    min-height: var(--ultra-control-h) !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    flex: 0 0 auto !important;
+  }
+
+  .filter:first-child {
+    margin-left: 0 !important;
+  }
+}
+
+/* Keep the entire filter set readable on the narrowest supported phones.
+   The filters get the full toolbar width; long names wrap as whole controls
+   rather than being ellipsized or colliding with RANDOM. */
+@media (max-width: 343px) {
+  .archive-tools {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+  }
+
+  .filter-group {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 0 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .filter {
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  .search-wrap {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+  }
+
+  #randomSong {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+}
+
+/* ================================================================
+   TABLET RESPONSIVE (769–1100px)
+   Width wins over pointer type here: touch tablets should not inherit the
+   phone composition simply because they report a coarse pointer.
+   ================================================================ */
+@media (min-width: 769px) and (max-width: 1100px) {
+  :root {
+    --pad: clamp(14px, 2.2vw, 24px);
+  }
+
+  /* Header: keep the editorial scale but reduce unused vertical space. */
+  .site-header {
+    min-height: 58vh !important;
+    padding-left: var(--pad) !important;
+    padding-right: var(--pad) !important;
+  }
+
+  .title-wrap h1 {
+    font-size: clamp(5rem, 12vw, 8.5rem) !important;
+  }
+
+  .header-meta {
+    width: min(100%, 620px) !important;
+  }
+
+  /* Toolbar: navigation/actions share row one; archive controls own row two. */
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    gap: 7px 12px !important;
+    padding: 8px var(--pad) !important;
+    align-items: center !important;
+  }
+
+  .view-switch {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    justify-self: start !important;
+  }
+
+  .nav-actions {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    gap: 6px !important;
+  }
+
+  .archive-tools {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: max-content minmax(180px, 1fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .filter-group {
+    min-width: 0 !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+  }
+
+  .filter {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+  }
+
+  .search-wrap {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-width: 0 !important;
+  }
+
+  .search-wrap input {
+    min-height: 34px !important;
+    padding-inline: 10px !important;
+    font-size: 11px !important;
+  }
+
+  .toolbar .view-button,
+  .toolbar .nav-action,
+  #randomSong {
+    min-height: 34px !important;
+    height: 34px !important;
+    box-sizing: border-box !important;
+  }
+
+  .toolbar .view-button,
+  .toolbar .nav-action,
+  #randomSong,
+  .filter {
+    font-size: 11px !important;
+  }
+
+  #randomSong {
+    padding-inline: 9px !important;
+  }
+
+  /* Song list: four useful columns fit comfortably on tablet. */
+  .table-head,
+  #songList .song-row .row-main,
+  #songList .song-row:hover .row-main,
+  #songList .song-row:focus-within .row-main,
+  #songList .song-row:active .row-main,
+  #songList .song-row.is-playing .row-main,
+  #songList .song-row.mobile-expanded .row-main {
+    grid-template-columns: 4.5ch minmax(190px, 1.65fr) minmax(120px, .8fr) 7ch !important;
+    gap: 10px !important;
+  }
+
+  .table-head span:nth-child(5),
+  #songList .song-row .song-date {
+    display: none !important;
+  }
+
+  .table-head span:nth-child(3),
+  #songList .song-row .song-artist {
+    display: block !important;
+  }
+
+  #songList .song-row .row-main {
+    min-height: 46px !important;
+    padding: 8px 0 !important;
+  }
+
+  #songList .song-row .song-title,
+  #songList .song-row:is(:hover, :focus-within, :active, .is-playing, .mobile-expanded) .song-title {
+    min-width: 0 !important;
+    font-size: clamp(15px, 1.8vw, 19px) !important;
+    line-height: 1.08 !important;
+  }
+
+  #songList .song-row .song-artist {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 12px !important;
+  }
+
+  #songList .song-row .song-number,
+  #songList .song-row .song-from {
+    font-size: 10px !important;
+  }
+
+  /* Expansion: note and buttons remain side-by-side until genuinely narrow. */
+  #songList .song-row .row-expanded,
+  #songList .song-row.mobile-expanded .row-expanded,
+  #songList .song-row:hover .row-expanded,
+  #songList .song-row:focus-within .row-expanded {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: end !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  #songList .song-row .expanded-left {
+    min-width: 0 !important;
+  }
+
+  #songList .song-row .expanded-copy {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+
+  #songList .song-row .expanded-note {
+    font-size: clamp(1.2rem, 2.6vw, 1.8rem) !important;
+    line-height: 1.04 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  #songList .song-row .expanded-actions {
+    align-self: end !important;
+    justify-self: end !important;
+    align-items: end !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+  }
+
+  #songList .song-row .play-song,
+  #songList .song-row .delete-song {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 0 9px !important;
+    box-sizing: border-box !important;
+    font-size: 10px !important;
+  }
+
+  /* Stats/timeline: preserve readable labels and allow horizontal timeline travel. */
+  .stats-view {
+    padding-left: var(--pad) !important;
+    padding-right: var(--pad) !important;
+  }
+
+  .stats-summary-line,
+  .timeline-legend {
+    font-size: 10px !important;
+  }
+
+  .timeline-art-mobile-sequence .timeline-track-viewport {
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+  }
+
+  .timeline-art-mobile-sequence .timeline-track-viewport::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Wall: avoid oversized cards and cramped editorial labels. */
+  .cover-wall {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .album-editorial-name {
+    font-size: clamp(.9rem, 1.8vw, 1.2rem) !important;
+  }
+
+  /* Player: tablet gets a medium-height player, not the phone 128px media box. */
+  body.player-open,
+  body.player-open:has(.media-embed.youtube-mode),
+  body.player-open:has(.media-embed.spotify-mode) {
+    padding-bottom: 224px !important;
+  }
+
+  .player-bar,
+  .player-bar:has(.media-embed.youtube-mode),
+  .player-bar:has(.media-embed.spotify-mode) {
+    grid-template-rows: auto 150px !important;
+    max-height: 248px !important;
+    padding-left: var(--pad) !important;
+    padding-right: var(--pad) !important;
+  }
+
+  .media-embed,
+  .media-embed.youtube-mode,
+  .media-embed.spotify-mode,
+  .youtube-player-mount,
+  .media-embed iframe,
+  .media-embed.youtube-mode iframe,
+  .media-embed.spotify-mode iframe,
+  .youtube-player-mount iframe,
+  .media-embed.spotify-mode .spotify-player-mount {
+    height: 150px !important;
+    min-height: 150px !important;
+    max-height: 150px !important;
+  }
+
+  .player-bar .player-meta-row,
+  .player-bar .source-tabs {
+    flex-wrap: nowrap !important;
+  }
+
+  .player-bar .source-tab,
+  .player-bar .source-tab[data-source="youtube"],
+  .player-bar .source-tab[data-source="spotify"] {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding-inline: 8px !important;
+    font-size: 10px !important;
+  }
+
+  /* Dialogs/forms should use available tablet width without becoming edge-to-edge. */
+  .song-dialog {
+    width: min(760px, calc(100vw - 36px)) !important;
+  }
+}
+
+/* Smaller portrait tablets: give filters their own line before search/random. */
+@media (min-width: 769px) and (max-width: 900px) {
+  .archive-tools {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+  }
+
+  .filter-group {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    justify-self: start !important;
+  }
+
+  .search-wrap {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+
+  #randomSong {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+
+  .cover-wall {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }

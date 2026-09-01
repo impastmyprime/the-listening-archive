@@ -5464,8 +5464,43 @@ function updateMobileSongWrapState(row) {
   row.style.setProperty("--mobile-first-line-width", `${titleSpan.getBoundingClientRect().width.toFixed(2)}px`);
 }
 
+function updateDesktopNoteWrapState(row) {
+  if (!row) return;
+
+  const isDesktopPointer = window.matchMedia(
+    "(min-width: 851px) and (hover: hover) and (pointer: fine)"
+  ).matches;
+
+  if (!isDesktopPointer) {
+    row.classList.remove("is-note-multiline");
+    return;
+  }
+
+  const note = row.querySelector(".expanded-note");
+  if (!note) return;
+
+  const range = document.createRange();
+  range.selectNodeContents(note);
+  const rects = Array.from(range.getClientRects()).filter(
+    rect => rect.width > 0 && rect.height > 0
+  );
+
+  if (rects.length) {
+    row.classList.toggle("is-note-multiline", rects.length > 1);
+    return;
+  }
+
+  const style = getComputedStyle(note);
+  const lineHeight = parseFloat(style.lineHeight) || 17.5;
+  const height = note.getBoundingClientRect().height;
+  row.classList.toggle("is-note-multiline", height > lineHeight * 1.45);
+}
+
 function syncMobileSongWrapStates() {
-  document.querySelectorAll(".song-row").forEach(updateMobileSongWrapState);
+  document.querySelectorAll(".song-row").forEach(row => {
+    updateMobileSongWrapState(row);
+    updateDesktopNoteWrapState(row);
+  });
 }
 
 function queueMobileSongWrapSync() {
