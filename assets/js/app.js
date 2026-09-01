@@ -6354,6 +6354,58 @@ function bindTimelineTapEffect(dot) {
   });
 }
 
+
+function enableDesktopTimelineDrag(viewport) {
+  if (!viewport || viewport.dataset.dragReady === "true") return;
+  viewport.dataset.dragReady = "true";
+
+  const desktopDrag = window.matchMedia(
+    "(min-width: 769px) and (max-width: 1919px) and (hover: hover) and (pointer: fine)"
+  );
+
+  let dragging = false;
+  let moved = false;
+  let startX = 0;
+  let startScrollLeft = 0;
+
+  viewport.addEventListener("pointerdown", event => {
+    if (!desktopDrag.matches || event.pointerType !== "mouse") return;
+    if (viewport.scrollWidth <= viewport.clientWidth) return;
+    if (event.button !== 0) return;
+
+    dragging = true;
+    moved = false;
+    startX = event.clientX;
+    startScrollLeft = viewport.scrollLeft;
+    viewport.classList.add("is-dragging");
+    viewport.setPointerCapture?.(event.pointerId);
+  });
+
+  viewport.addEventListener("pointermove", event => {
+    if (!dragging || !desktopDrag.matches) return;
+
+    const delta = event.clientX - startX;
+    if (Math.abs(delta) > 3) moved = true;
+    viewport.scrollLeft = startScrollLeft - delta;
+  });
+
+  const endDrag = event => {
+    if (!dragging) return;
+    dragging = false;
+    viewport.classList.remove("is-dragging");
+    try {
+      viewport.releasePointerCapture?.(event.pointerId);
+    } catch {}
+  };
+
+  viewport.addEventListener("pointerup", endDrag);
+  viewport.addEventListener("pointercancel", endDrag);
+  viewport.addEventListener("lostpointercapture", () => {
+    dragging = false;
+    viewport.classList.remove("is-dragging");
+  });
+}
+
 function renderTimeline(stats) {
   hideTimelineClusterPopover();
   timelineArt.innerHTML = "";
@@ -6472,6 +6524,20 @@ function renderTimeline(stats) {
 
     track.appendChild(dot);
   });
+
+  if (trackViewport) {
+    enableDesktopTimelineDrag(trackViewport);
+
+    const desktopDrag = window.matchMedia(
+      "(min-width: 769px) and (max-width: 1919px) and (hover: hover) and (pointer: fine)"
+    ).matches;
+
+    if (desktopDrag) {
+      requestAnimationFrame(() => {
+        trackViewport.scrollLeft = trackViewport.scrollWidth;
+      });
+    }
+  }
 
   timelineStart.textContent = shortDate(stats.ordered[0].createdAt);
   timelineEnd.textContent = shortDate(stats.ordered[stats.ordered.length - 1].createdAt);
